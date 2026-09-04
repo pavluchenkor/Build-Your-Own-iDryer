@@ -319,3 +319,20 @@ This section should explain:
 ## Main Goal
 
 After reading this section, the user should understand what they are doing and why, instead of becoming more confused.
+
+## License
+
+This repository combines documentation and example source code, licensed
+separately — see [LICENSE.txt](LICENSE.txt) and [NOTICE](NOTICE).
+
+- **Documentation** (all prose, guides, images): [CC BY 4.0](LICENSE-Documentation.txt)
+- **Source code** (including the example firmware under `example/`): [Apache License 2.0](LICENSE-Software.txt)
+
+Both licenses permit commercial use.
+
+The licenses do not grant rights to the iDryer name. Community projects are
+welcome and the naming policy is permissive — see
+[TRADEMARKS.md](https://github.com/pavluchenkor/idryer-core/blob/main/TRADEMARKS.md).
+
+Hardware design, CAD files and PCB sources are licensed separately and are not
+covered by this repository.

@@ -1,0 +1,26 @@
+Build Your Own iDryer
+Copyright 2026 Ruslan Pavluchenko
+
+This product includes software developed as part of the iDryer project
+(https://docs.iDryer.org/).
+
+Documentation is licensed under CC BY 4.0, source code under the Apache
+License, Version 2.0. See LICENSE.txt.
+
+"iDryer" is a trademark of Ruslan Pavluchenko. Neither license grants
+permission to use the trademark. See TRADEMARKS.md in the idryer-core
+repository for the naming policy.
+
+-------------------------------------------------------------------------
+THIRD-PARTY COMPONENTS
+-------------------------------------------------------------------------
+
+The example firmware project under example/ depends on the following
+third-party libraries, each distributed under its own license:
+
+  ArduinoJson              MIT        https://github.com/bblanchon/ArduinoJson
+  PubSubClient             MIT        https://github.com/knolleary/pubsubclient
+  Improv WiFi Library      MIT        https://github.com/jnthas/Improv-WiFi-Library
+  arduinoWebSockets        LGPL-2.1   https://github.com/Links2004/arduinoWebSockets
+  base64                   MIT        https://github.com/densaugeo/base64
+  SHT31                    MIT        https://github.com/RobTillaart/SHT31

@@ -1,0 +1,26 @@
+Build Your Own iDryer
+Copyright 2026 Ruslan Pavluchenko
+
+This repository combines documentation and example source code, which are
+licensed separately.
+
+# Documentation
+
+All prose, guides, images and diagrams (the *.md files and the docs/ tree).
+See ./LICENSE-Documentation.txt  --  CC BY 4.0
+
+# Software
+
+All source code, including the example firmware project under example/.
+See ./LICENSE-Software.txt  --  Apache License 2.0
+
+# Hardware
+
+Mechanical design, CAD files and PCB sources are NOT covered by this
+repository and are licensed separately. See the iDryer X repository.
+
+# Trademark
+
+"iDryer" is a trademark of Ruslan Pavluchenko. Neither license grants
+permission to use the trademark. See TRADEMARKS.md in the idryer-core
+repository for the naming policy.
