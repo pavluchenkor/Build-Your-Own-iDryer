@@ -93,6 +93,8 @@ static void onThresholdChanged(float v) {}
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // El dispositivo se desvinculó en el portal: borrar el secreto y esperar una nueva vinculación.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetría: campo vocIndex propio (capítulo 5).
@@ -129,7 +131,7 @@ El orden de entidades en la tarjeta es el orden de su declaración en `setup()`.
 
 ## 3. Tu propio diseño de la tarjeta (opcional)
 
-Primero, cómo está estructurada la tarjeta. La tarjeta es una pila vertical de **filas**. Una fila es una tira horizontal en la que están de una a cuatro entidades; la comparten el ancho de la tarjeta equitativamente: una entidad en una fila ocupará todo el ancho, dos — la mitad cada una, tres — un tercio cada una.
+Primero, cómo está organizada la tarjeta. La tarjeta es una pila vertical de **filas**. Una fila de celdas de sensores reparte el ancho a partes iguales: una celda ocupa todo el ancho, dos, la mitad cada una, tres, un tercio cada una. Los controles (lista, campo, botón) de una fila se colocan uno debajo de otro a todo el ancho.
 
 El diseño automático del párrafo anterior distribuye las entidades en estas filas por sí solo. Si quieres decidir tú qué va junto a qué, — especifica las filas manualmente con llamadas `layoutRow`. Una llamada = una fila, el orden de llamadas = el orden de filas de arriba abajo:
 
@@ -137,7 +139,7 @@ El diseño automático del párrafo anterior distribuye las entidades en estas f
 // Fila 1: dos celdas — índice VOC y ventilador, cada una por la mitad del ancho.
 s_link.card().layoutRow("voc", "fan");
 
-// Fila 2: dos órganos de control — modo y umbral, también por mitades.
+// Fila 2: dos controles — modo y umbral, uno debajo del otro.
 s_link.card().layoutRow("mode", "threshold");
 ```
 
@@ -149,8 +151,11 @@ En la tarjeta esto dará esta composición:
 ┌─ DIY Air Filter ────────────────┐
 │  VOC index        │  Ventilador │   ← fila 1: voc, fan
 │  103              │  Apagado    │
-├───────────────────┼─────────────┤
-│  Mode      [auto ▾] │ Threshold [150] │   ← fila 2: mode, threshold
+├───────────────────┴─────────────┤
+│  Mode                           │   ← fila 2: mode, threshold
+│  [auto                       ▾] │
+│  VOC threshold                  │
+│  [150                         ] │
 └─────────────────────────────────┘
 ```
 
@@ -181,13 +186,16 @@ No necesitas entender este JSON — el núcleo lo genera a partir de tus llamada
 
 ## 5. Verificación
 
-Carga el firmware y abre el dispositivo en el portal:
+Graba el firmware y abre el dashboard del portal:
 
 - la celda **VOC index** muestra el índice en vivo (sopla en el sensor — el número crece en la siguiente actualización);
 - la celda **Ventilador** — Encendido/Apagado;
-- **Mode** — lista desplegable, **VOC threshold** — campo con botón de envío.
+- **Mode** — lista desplegable, **VOC threshold** — campo numérico: el valor se envía unos 0,6 s después de cambiarlo, sin botón de confirmación. La lista y el campo empiezan en la primera opción y en el mínimo: envían comandos y no muestran el ajuste actual del dispositivo; el estado lo muestran las celdas (por ejemplo, el ventilador).
 
 La selección de modo y umbral aún no hace nada — callbacks de prueba. Los animaremos en el [siguiente capítulo](07-auto-logic.md).
 
 !!! note "Este es ese concepto mismo"
     Nota qué pasó: describiste la interfaz en cinco líneas en el firmware — y apareció en el portal y en la aplicación. El mismo truco funciona para cualquier dispositivo: solo cambian id, firmas y callbacks.
+
+!!! note "Operaciones con arranque y parada"
+    La lista, el campo y el botón envían un valor al momento. Las operaciones con arranque y parada —secado, calentamiento, iluminación— se declaran como **acciones** de la tarjeta con un modo y parámetros de arranque: la tarjeta muestra un formulario de arranque y, mientras dura la operación, un bloque de sesión con el botón de parada. Ejemplo: el [capítulo 7](../09-build-a-device/07-heating-control.md) de la sección del armario.

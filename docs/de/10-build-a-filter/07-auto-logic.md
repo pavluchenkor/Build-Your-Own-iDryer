@@ -122,6 +122,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);  // Lüfter-Schlüssel-Pin – auf Ausgang
 
     s_link.begin();
+    // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetrie: eigenes Feld vocIndex (Kapitel 5).
@@ -263,6 +265,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);
 
     s_link.begin();                   // Wi-Fi, MQTT, Bindung – alles drin
+    // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetrie: eigenes Feld vocIndex hinzufügen (Kapitel 5).

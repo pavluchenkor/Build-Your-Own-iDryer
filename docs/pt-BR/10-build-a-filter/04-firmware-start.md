@@ -1,11 +1,11 @@
 ---
 title: "Filtro inteligente: início do firmware e vinculação ao portal"
-description: "Estrutura base do firmware do filtro em idryer-core: configuração de tipo de dispositivo não-padrão, primeiro lançamento, vinculação à conta por PIN."
+description: "Estrutura base do firmware do filtro em idryer-core: configuração de tipo de dispositivo não-padrão, primeiro lançamento, vinculação à conta no app."
 ---
 
 # Início do firmware
 
-A estrutura do projeto repete completamente o [capítulo do exemplo do gabinete](../09-build-a-device/04-firmware-start.md): PlatformIO, `secrets.h`, `idryer-core` em `lib/`, o mesmo `platformio.ini` (apenas mude o nome do ambiente para `filter`). Aqui — apenas o que é diferente.
+A estrutura do projeto repete completamente o [capítulo do exemplo do gabinete](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` em `lib/`, o mesmo `platformio.ini` (apenas mude o nome do ambiente para `filter`). Aqui — apenas o que é diferente.
 
 ## Config: dispositivo de tipo não-padrão
 
@@ -33,6 +33,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Dispositivo desvinculado no portal: apagar o segredo e aguardar nova vinculação.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -51,16 +53,12 @@ Observe: não há flag "hasVoc" na `Config`. O dicionário `has*` descreve perif
 
 ## Primeiro lançamento e vinculação
 
-O procedimento é idêntico ao exemplo do gabinete:
+O procedimento é o mesmo do gabinete:
 
-1. Carregue a placa e abra o Serial Monitor.
-2. O dispositivo ativa Wi-Fi (dados de `secrets.h`), se registra e imprime o PIN:
-   ```text
-   [CLOUD] PIN: 1234567 (expires in 600s)
-   ```
-3. No [portal](https://portal.idryer.org/) — "Adicionar dispositivo" → insira o PIN.
-4. Após a vinculação, o log mostrará `Device claimed!`, o dispositivo entrará em `Online`.
+1. Grave a placa e abra o Serial Monitor: enquanto o dispositivo não tem Wi-Fi, o log fica em silêncio.
+2. No app iDryer: **Conectar novo dispositivo** → passo **Wi-Fi** (rede e senha, **Conectar dispositivo**) → passo **Vinculação** → **Vincular**.
+3. Depois de **Dispositivo vinculado**, o dispositivo está vinculado à sua conta e fica `Online` no portal; o log mostra `MQTT: Connected!`.
 
-Discussão detalhada de vinculação, erros de Wi-Fi e revinculação — no [capítulo do exemplo do gabinete](../09-build-a-device/04-firmware-start.md).
+Detalhes, erros possíveis e nova vinculação — no [capítulo do exemplo do gabinete](../09-build-a-device/04-firmware-start.md).
 
 O dispositivo já é visível no portal, mas o cartão está quase vazio — ainda não há dados. Vamos conectar o sensor.

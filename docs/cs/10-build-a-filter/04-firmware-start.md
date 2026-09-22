@@ -1,11 +1,11 @@
 ---
 title: "Chytrý filtr: start programu a připojení k portálu"
-description: "Kostra programu filtru na idryer-core: Config nestandardního typu zařízení, první spuštění, připojení k účtu přes PIN."
+description: "Kostra programu filtru na idryer-core: Config nestandardního typu zařízení, první spuštění, spárování s účtem v aplikaci."
 ---
 
 # Start programu
 
-Kostra projektu je totožná s [kapitolou z příkladu se skříní](../09-build-a-device/04-firmware-start.md): PlatformIO, `secrets.h`, `idryer-core` v `lib/`, stejný `platformio.ini` (změňte pouze název prostředí na `filter`). Zde — jen to, co se liší.
+Kostra projektu je totožná s [kapitolou z příkladu se skříní](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` v `lib/`, stejný `platformio.ini` (změňte pouze název prostředí na `filter`). Zde — jen to, co se liší.
 
 ## Config: zařízení nestandardního typu
 
@@ -33,6 +33,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -51,16 +53,12 @@ Všimněte si: v `Config` žádný příznak „hasVoc" není. Slovník `has*` p
 
 ## První spuštění a spárování
 
-Postup se neliší od příkladu se skříní:
+Postup je stejný jako u skříně:
 
-1. Nahrajte firmware do desky, otevřete Serial Monitor.
-2. Zařízení se připojí k Wi-Fi (přihlašovací údaje z `secrets.h`), zaregistruje se a vypíše PIN:
-   ```text
-   [CLOUD] PIN: 1234567 (expires in 600s)
-   ```
-3. V [portálu](https://portal.idryer.org/) — „Přidat zařízení" → zadejte PIN.
-4. Po spárování se v logu objeví `Device claimed!`, zařízení přejde do stavu `Online`.
+1. Nahrajte firmware a otevřete Serial Monitor: dokud zařízení nemá Wi-Fi, log mlčí.
+2. V aplikaci iDryer: **Připojit nové zařízení** → krok **Wi-Fi** (síť a heslo, **Připojit zařízení**) → krok **Spárování** → **Spárovat**.
+3. Po zprávě **Zařízení spárováno** je zařízení propojené s vaším účtem a na portálu přejde do stavu `Online`; v logu je `MQTT: Connected!`.
 
-Podrobný rozbor spárování, chyb Wi-Fi a opakovaného párování — v [kapitole příkladu se skříní](../09-build-a-device/04-firmware-start.md).
+Podrobnosti, možné chyby a opětovné propojení — v [kapitole příkladu se skříní](../09-build-a-device/04-firmware-start.md).
 
 V portálu je zařízení vidět, ale karta je zatím téměř prázdná — data ještě nejsou. Jdeme připojit senzor.

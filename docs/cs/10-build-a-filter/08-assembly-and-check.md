@@ -21,7 +21,7 @@ Kontrolujte v pořadí — každý bod staví na předchozích.
 |---|---|---|
 | 1 | Napájení | 12 V na větvi ventilátoru, 5 V za buck, 3,3 V na senzoru |
 | 2 | Senzor funguje | v Serial logu index ~100 v čistém vzduchu, roste po výdechu |
-| 3 | Zařízení Online | stav v portálu po spárování přes PIN |
+| 3 | Zařízení Online | stav v portálu po spárování v aplikaci |
 | 4 | Telemetrie | `vocIndex` a `fanStatus` ve streamu zařízení |
 | 5 | Karta | dlaždice VOC a Ventilátor, seznam Mode, pole Threshold |
 | 6 | Příkaz z portálu | Mode → `on`: ventilátor se zapnul, karta zobrazila „Zap" |
@@ -33,7 +33,7 @@ Kontrolujte v pořadí — každý bod staví na předchozích.
 Filtr je hotov. Dál — dle libosti:
 
 - **Více entit**: tlačítko „proplach 5 minut" (`card().button(...)`), druhý senzor, čítač provozních hodin filtru s upozorněním na výměnu;
-- **Vlastní rozvržení**: `layoutRow` jste již viděli; kartu bude v budoucnu možné skládat i v editoru na portálu;
+- **Vlastní rozvržení**: `layoutRow` jste již viděli;
 - **Vlastní zařízení**: celý tento oddíl je šablona. Vyměňte senzor, akční člen a logiku — a podle stejného schématu postavíte zvlhčovač, odsávání, regulátor čehokoli. Manifest rozhraní sestaví sám.
 
 Pokud se něco nespustí — [Typické chyby](../08-common-mistakes/01-power-mistakes.md).

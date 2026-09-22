@@ -16,7 +16,7 @@ Der Filter hier ist nur ein Beispiel. Der gezeigte Ansatz funktioniert für **je
 Dies funktioniert dank des Mechanismus der **dynamischen Karten** (Entity Manifest): Das Gerät veröffentlicht eine maschinell lesbare Beschreibung „was anzeigen und steuern", und Portal und App bauen die Benutzeroberfläche nach dieser Beschreibung. Wie das im Code aussieht – [siehe das Kapitel über die Karte](06-card.md).
 
 !!! note "Was das praktisch bedeutet"
-    Gerät erfunden → auf ESP32 gebaut → Sensoren und Tasten in der Firmware beschrieben → mit PIN ans Konto gebunden. Fertig: Das Gerät hat eine Benutzeroberfläche im Portal und in der App. Die Distanz von der Idee bis „ich steuere vom Smartphone" – ein Abend.
+    Gerät erfunden → auf ESP32 gebaut → Sensoren und Tasten in der Firmware beschrieben → in der App ans Konto gekoppelt. Fertig: Das Gerät hat eine Benutzeroberfläche im Portal und in der App. Die Distanz von der Idee bis „ich steuere vom Smartphone" – ein Abend.
 
 ## Was genau wir bauen
 

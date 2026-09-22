@@ -16,7 +16,7 @@ Filtr zde je jen příklad. Popsaný přístup funguje pro **jakékoliv zaříze
 Funguje to díky mechanismu **dynamických karet** (entity manifest): zařízení zveřejní strojově čitelný popis „co zobrazit a čím ovládat", a portál s aplikací si podle něj sestaví rozhraní. Jak to vypadá v kódu — [kapitola o kartě](06-card.md).
 
 !!! note "Co to znamená v praxi"
-    Vymysleli jste zařízení → sestavili na ESP32 → popsali senzory a tlačítka v programu → spárovali s účtem přes PIN. Hotovo: zařízení má rozhraní v portálu a aplikaci. Od nápadu po „ovládám ze smartphonu" — jeden večer.
+    Vymysleli jste zařízení → sestavili na ESP32 → popsali senzory a tlačítka v programu → spárovali s účtem v aplikaci. Hotovo: zařízení má rozhraní v portálu a aplikaci. Od nápadu po „ovládám ze smartphonu" — jeden večer.
 
 ## Co přesně stavíme
 

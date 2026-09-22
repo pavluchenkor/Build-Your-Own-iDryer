@@ -21,7 +21,7 @@ Vérifiez dans l'ordre — chaque point s'appuie sur les précédents.
 |---|---|---|
 | 1 | Alimentation | 12 V sur la ligne du ventilateur, 5 V après buck, 3,3 V sur le capteur |
 | 2 | Capteur vivant | dans le log Serial indice ~100 en air pur, croît du souffle |
-| 3 | Appareil Online | statut sur portail après attachement par PIN |
+| 3 | Appareil Online | statut sur le portail après association dans l'application |
 | 4 | Télémétrie | `vocIndex` et `fanStatus` dans le flux de l'appareil |
 | 5 | Fiche | cellules VOC et Ventilateur, liste Mode, champ Threshold |
 | 6 | Commande du portail | Mode → `on`: ventilateur allumé, fiche affiche « Allumé » |
@@ -33,7 +33,7 @@ Vérifiez dans l'ordre — chaque point s'appuie sur les précédents.
 Le filtre est prêt. Après — selon le goût :
 
 - **Plus d'entités** : bouton « soufflage 5 min » (`card().button(...)`), deuxième capteur, compteur de motos du filtre avec rappel de remplacement ;
-- **Mise en page jolie** : vous avez déjà vu le `layoutRow` usine ; la fiche peut aussi se composer dans un éditeur sur le portail ;
+- **Mise en page jolie** : vous avez déjà vu le `layoutRow` usine ;
 - **Vos propres appareils** : toute cette section — c'est un patron. Remplacez capteur, actionneur et logique — et par le même schéma vous assemblerez un humidificateur, une extraction, un contrôleur de n'importe quoi. Le manifeste fera l'interface seul.
 
 Si quelque chose ne marche pas — [Erreurs typiques](../08-common-mistakes/01-power-mistakes.md).

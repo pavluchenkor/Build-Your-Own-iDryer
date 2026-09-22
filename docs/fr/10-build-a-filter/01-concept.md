@@ -16,7 +16,7 @@ Le filtre ici est simplement un exemple. L'approche présentée fonctionne pour 
 Cela fonctionne grâce au mécanisme des **fiches dynamiques** (entity manifest) : l'appareil publie une description lisible par machine « quoi afficher et comment commander », et le portail et l'application construisent l'interface selon cette description. À quoi cela ressemble dans le code — [chapitre sur la fiche](06-card.md).
 
 !!! note "Que signifie cela en pratique"
-    Vous avez une idée d'appareil → l'assemblez sur ESP32 → décrivez les capteurs et boutons dans le firmware → attachez-le à votre compte par PIN. C'est tout : l'appareil a une interface sur le portail et dans l'application. La distance de l'idée à « je contrôle depuis mon téléphone » — une soirée.
+    Vous avez une idée d'appareil → l'assemblez sur ESP32 → décrivez les capteurs et boutons dans le firmware → associez-le à votre compte dans l'application. C'est tout : l'appareil a une interface sur le portail et dans l'application. La distance de l'idée à « je contrôle depuis mon téléphone » — une soirée.
 
 ## Exactement ce que nous construisons
 

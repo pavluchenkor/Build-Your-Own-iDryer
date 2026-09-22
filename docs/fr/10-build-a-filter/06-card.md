@@ -94,6 +94,8 @@ static void onThresholdChanged(float v) {}
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Télémétrie: votre champ vocIndex (chapitre 5).
@@ -130,7 +132,7 @@ L'ordre des entités sur la fiche — l'ordre de leur déclaration dans `setup()
 
 ## 3. Mise en page personnalisée de la fiche (optionnel)
 
-D'abord — comment s'organise la fiche. La fiche est une pile verticale de **rangées**. Une rangée est une bande horizontale où tiennent une à quatre entités ; elles partagent la largeur de manière égale : une entité par rangée prend toute la largeur, deux — par moitié, trois — par tiers.
+D'abord — comment s'organise la fiche. La fiche est une pile verticale de **rangées**. Une rangée de cellules de capteurs partage la largeur à parts égales : une cellule prend toute la largeur, deux — la moitié chacune, trois — un tiers chacune. Les commandes (liste, champ, bouton) d'une rangée se placent l'une sous l'autre sur toute la largeur.
 
 La mise en page automatique du paragraphe précédent arrange les entités dans ces rangées elle-même. Si vous voulez décider vous-même quoi mettre côte à côte — définissez les rangées manuellement par les appels `layoutRow`. Un appel = une rangée, l'ordre des appels = l'ordre des rangées de haut en bas :
 
@@ -138,7 +140,7 @@ La mise en page automatique du paragraphe précédent arrange les entités dans 
 // Rangée 1 : deux cellules — indice VOC et ventilateur, chacun par moitié.
 s_link.card().layoutRow("voc", "fan");
 
-// Rangée 2 : deux organes de commande — mode et seuil, aussi par moitié.
+// Rangée 2 : deux commandes — mode et seuil, l'une sous l'autre.
 s_link.card().layoutRow("mode", "threshold");
 ```
 
@@ -150,8 +152,11 @@ Sur la fiche ça donnera cette composition :
 ┌─ DIY Air Filter ────────────────┐
 │  VOC index        │  Ventilateur │   ← rangée 1: voc, fan
 │  103              │  Éteint      │
-├───────────────────┼─────────────┤
-│  Mode      [auto ▾] │ Threshold [150] │   ← rangée 2: mode, threshold
+├───────────────────┴─────────────┤
+│  Mode                           │   ← rangée 2: mode, threshold
+│  [auto                       ▾] │
+│  VOC threshold                  │
+│  [150                         ] │
 └─────────────────────────────────┘
 ```
 
@@ -182,13 +187,16 @@ Comprendre ce JSON n'est pas obligatoire — le noyau le génère à partir de v
 
 ## 5. Vérification
 
-Flashez et ouvrez l'appareil sur le portail :
+Flashez et ouvrez le tableau de bord du portail :
 
 - la cellule **VOC index** montre l'indice en direct (soufflez sur le capteur — le nombre croît au prochain mise à jour) ;
 - la cellule **Ventilateur** — Allumé/Éteint ;
-- **Mode** — menu déroulant, **VOC threshold** — champ avec bouton d'envoi.
+- **Mode** — liste déroulante, **VOC threshold** — champ numérique : la valeur part environ 0,6 s après la modification, sans bouton de confirmation. La liste et le champ commencent à la première option et au minimum : ils envoient des commandes et n'affichent pas le réglage actuel de l'appareil ; l'état est montré par les cellules (par exemple le ventilateur).
 
 La sélection du mode et du seuil ne fait rien pour le moment — ce sont des callbacks vides. Nous les ferons vivre dans [le chapitre suivant](07-auto-logic.md).
 
 !!! note "C'est exactement ce concept"
     Remarquez ce qui s'est passé : vous avez décrit l'interface en cinq lignes de firmware — et elle est apparue sur le portail et l'app. Le même truc fonctionne pour n'importe quel appareil à vous : changez juste l'id, les signatures et les callbacks.
+
+!!! note "Opérations avec démarrage et arrêt"
+    La liste, le champ et le bouton envoient une valeur tout de suite. Les opérations avec démarrage et arrêt — séchage, chauffage, éclairage — se déclarent comme **actions** de la carte avec un mode et des paramètres de lancement : la carte affiche un formulaire de démarrage et, pendant l'opération, un bloc de session avec un bouton d'arrêt. Exemple : le [chapitre 7](../09-build-a-device/07-heating-control.md) de la section sur l'armoire.

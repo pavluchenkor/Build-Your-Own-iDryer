@@ -1,11 +1,11 @@
 ---
 title: "スマートフィルター: ファームウェア開始とポータルへのバインディング"
-description: "フィルターのファームウェアスケルトンをidryer-coreで: 非標準型デバイスのConfig、初回起動、PINでのアカウントバインディング。"
+description: "フィルターのファームウェアスケルトンをidryer-coreで: 非標準型デバイスのConfig、初回起動、アプリでのアカウントへのペアリング。"
 ---
 
 # ファームウェア開始
 
-プロジェクトのひな型は[キャビネットサンプルの章](../09-build-a-device/04-firmware-start.md)と全く同じです: PlatformIO、`secrets.h`、`lib/`内の`idryer-core`、同じ`platformio.ini`（環境名を`filter`に変えるだけ）。ここでは異なる部分だけを説明します。
+プロジェクトのひな型は[キャビネットサンプルの章](../09-build-a-device/04-firmware-start.md)と全く同じです: PlatformIO、`lib/`内の`idryer-core`、同じ`platformio.ini`（環境名を`filter`に変えるだけ）。ここでは異なる部分だけを説明します。
 
 ## Config: 非標準型デバイス
 
@@ -33,6 +33,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -51,16 +53,12 @@ void loop() {
 
 ## 初回起動と登録
 
-この手順はキャビネットサンプルと同じです:
+手順はキャビネットと同じです：
 
-1. ボードに書き込み、シリアルモニターを開きます。
-2. デバイスがWi-Fiに接続（`secrets.h`の設定を使用）、登録完了後にPINを表示します:
-   ```text
-   [CLOUD] PIN: 1234567 (expires in 600s)
-   ```
-3. [ポータル](https://portal.idryer.org/) で「デバイスを追加」→ PINを入力します。
-4. 登録完了後、ログに`Device claimed!`が表示され、デバイスは`Online`状態になります。
+1. ボードに書き込み、シリアルモニターを開きます。デバイスにWi-Fiがない間、ログは出ません。
+2. iDryerアプリで：**新しいデバイスを接続** → **Wi-Fi**ステップ（ネットワークとパスワード、**デバイスを接続**）→ **ペアリング**ステップ → **ペアリング**。
+3. **ペアリングが完了しました**の後、デバイスはあなたのアカウントに紐付けられ、ポータルで`Online`になります。ログには`MQTT: Connected!`が表示されます。
 
-バインディングの詳細、Wi-Fiエラーへの対処、再バインディング方法については [キャビネットサンプルの章](../09-build-a-device/04-firmware-start.md) を参照してください。
+詳細、起こりうるエラー、再ペアリングについては[キャビネットの例の章](../09-build-a-device/04-firmware-start.md)を参照してください。
 
 ポータルにデバイスが表示されますが、カードはまだほぼ空です — データがないためです。センサーの接続に進みましょう。

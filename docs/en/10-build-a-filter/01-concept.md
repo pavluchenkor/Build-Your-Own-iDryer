@@ -16,7 +16,7 @@ The filter here is just an example. The approach shown here works for **any devi
 This works thanks to the **dynamic card** mechanism (entity manifest): the device publishes a machine-readable description of "what to show and what to control," and the portal and app build the interface from this description. How this looks in the code — [chapter on the card](06-card.md).
 
 !!! note "What this means in practice"
-    Invent a device → assemble it on ESP32 → describe the sensors and buttons in the firmware → link to your account via PIN. Done: the device has an interface on the portal and in the app. From idea to "I control it from my phone" is one evening of work.
+    Invent a device → assemble it on ESP32 → describe the sensors and buttons in the firmware → link it to your account in the app. Done: the device has an interface on the portal and in the app. From idea to "I control it from my phone" is one evening of work.
 
 ## What exactly are we building
 

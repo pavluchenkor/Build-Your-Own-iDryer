@@ -93,6 +93,8 @@ static void onThresholdChanged(float v) {}
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Dispositivo desvinculado no portal: apagar o segredo e aguardar nova vinculação.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetria: seu campo vocIndex (capítulo 5).
@@ -129,7 +131,7 @@ A ordem das entidades no cartão — ordem de sua declaração em `setup()`.
 
 ## 3. Layout customizado do cartão (opcional)
 
-Primeiro — como o cartão é organizado. O cartão — é uma pilha vertical de **linhas**. Uma linha — uma faixa horizontal onde ficam de uma a quatro entidades; dividem a largura do cartão igualmente: uma entidade em uma linha ocupa toda a largura, duas — metade cada, três — um terço.
+Primeiro — como o cartão é organizado. O cartão é uma pilha vertical de **linhas**. Uma linha de células de sensores divide a largura igualmente: uma célula ocupa a largura toda, duas — metade cada, três — um terço cada. Os controles (lista, campo, botão) de uma linha ficam um embaixo do outro, na largura toda.
 
 O layout automático da seção anterior distribui entidades por estas linhas sozinho. Se você quiser decidir sozinho o que fica junto — especifique as linhas manualmente por chamadas `layoutRow`. Uma chamada = uma linha, ordem de chamadas = ordem das linhas de cima para baixo:
 
@@ -137,7 +139,7 @@ O layout automático da seção anterior distribui entidades por estas linhas so
 // Linha 1: duas células — índice VOC e ventilador, cada uma metade da largura.
 s_link.card().layoutRow("voc", "fan");
 
-// Linha 2: dois órgãos de controle — modo e limiar, também metade cada.
+// Linha 2: dois controles — modo e limite, um embaixo do outro.
 s_link.card().layoutRow("mode", "threshold");
 ```
 
@@ -149,8 +151,11 @@ No cartão isto resultará em tal composição:
 ┌─ DIY Air Filter ────────────────┐
 │  VOC index        │  Ventilador │   ← linha 1: voc, fan
 │  103              │  Deslig      │
-├───────────────────┼─────────────┤
-│  Mode      [auto ▾] │ Threshold [150] │   ← linha 2: mode, threshold
+├───────────────────┴─────────────┤
+│  Mode                           │   ← linha 2: mode, threshold
+│  [auto                       ▾] │
+│  VOC threshold                  │
+│  [150                         ] │
 └─────────────────────────────────┘
 ```
 
@@ -181,13 +186,16 @@ Não é necessário entender este JSON — o núcleo o gera de suas chamadas. Ma
 
 ## 5. Verificação
 
-Carregue e abra o dispositivo no portal:
+Grave o firmware e abra o dashboard do portal:
 
 - célula **VOC index** mostra índice ao vivo (sopre no sensor — o número cresce na próxima atualização);
 - célula **Ventilador** — Lig/Deslig;
-- **Mode** — lista suspensa, **VOC threshold** — campo com botão de envio.
+- **Mode** — lista suspensa, **VOC threshold** — campo numérico: o valor é enviado cerca de 0,6 s depois da mudança, sem botão de confirmação. A lista e o campo começam na primeira opção e no mínimo — eles enviam comandos e não mostram a configuração atual do dispositivo; o estado aparece nas células (por exemplo, o ventilador).
 
 Seleção de modo e limiar ainda não fazem nada — callbacks são esboços. Vamos trazê-los à vida no [próximo capítulo](07-auto-logic.md).
 
 !!! note "Isto é o conceito na prática"
     Veja o que aconteceu: você descreveu a interface com cinco linhas no firmware — e ela apareceu no portal e aplicativo. O mesmo truque funciona para qualquer dispositivo seu: mudam apenas ids, legendas e callbacks.
+
+!!! note "Operações com partida e parada"
+    A lista, o campo e o botão enviam o valor na hora. Operações com partida e parada — secagem, aquecimento, iluminação — são declaradas como **ações** do cartão com um modo e parâmetros de partida: o cartão mostra um formulário de partida e, enquanto a operação roda, um bloco de sessão com o botão de parada. Exemplo — o [capítulo 7](../09-build-a-device/07-heating-control.md) da seção do gabinete.

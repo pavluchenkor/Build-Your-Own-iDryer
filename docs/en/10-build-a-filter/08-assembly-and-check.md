@@ -21,7 +21,7 @@ Check in order — each point depends on the previous ones.
 |---|---|---|
 | 1 | Power | 12V on fan line, 5V after buck, 3.3V on sensor |
 | 2 | Sensor alive | in Serial log index ~100 in clean air, grows from breath |
-| 3 | Device Online | status on portal after PIN linking |
+| 3 | Device Online | status on the portal after pairing in the app |
 | 4 | Telemetry | `vocIndex` and `fanStatus` in device stream |
 | 5 | Card | VOC and Fan cells, Mode list, Threshold field |
 | 6 | Command from portal | Mode → `on`: fan turned on, card shows "On" |
@@ -33,7 +33,7 @@ Check in order — each point depends on the previous ones.
 Filter is ready. Next — your choice:
 
 - **More entities**: button "purge 5 minutes" (`card().button(...)`), second sensor, fan hours counter with replacement reminder;
-- **Nice layout**: factory `layoutRow` you already saw; card will also be layout-editable in the portal editor;
+- **Nice layout**: factory `layoutRow` you already saw;
 - **Your devices**: this whole section is a template. Replace the sensor, actuator, and logic — and by the same scheme assemble a humidifier, exhaust, controller of anything. The manifest will build the interface itself.
 
 If something doesn't start — [Common Mistakes](../08-common-mistakes/01-power-mistakes.md).

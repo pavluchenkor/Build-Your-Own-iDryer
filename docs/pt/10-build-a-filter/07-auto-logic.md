@@ -122,6 +122,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);  // pino da chave do ventilador — para saída
 
     s_link.begin();
+    // Dispositivo desassociado no portal: apagar o segredo e aguardar nova vinculação.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetria: campo próprio vocIndex (capítulo 5).
@@ -263,6 +265,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);
 
     s_link.begin();                   // Wi-Fi, MQTT, ligação — tudo dentro
+    // Dispositivo desassociado no portal: apagar o segredo e aguardar nova vinculação.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetria: adicionamos o campo próprio vocIndex (capítulo 5).

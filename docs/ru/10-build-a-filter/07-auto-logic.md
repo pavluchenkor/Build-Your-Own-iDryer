@@ -122,6 +122,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);  // пин ключа вентилятора — на выход
 
     s_link.begin();
+    // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Телеметрия: своё поле vocIndex (глава 5).
@@ -263,6 +265,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);
 
     s_link.begin();                   // Wi-Fi, MQTT, привязка — всё внутри
+    // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Телеметрия: дописываем своё поле vocIndex (глава 5).

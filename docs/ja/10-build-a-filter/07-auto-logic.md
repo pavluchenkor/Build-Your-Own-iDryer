@@ -122,6 +122,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);  // ファンキーピン — 出力
 
     s_link.begin();
+    // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // テレメトリ: 独自フィールドvocIndex（第5章）。
@@ -263,6 +265,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);
 
     s_link.begin();                   // Wi-Fi、MQTT、バインディング — 全部内部
+    // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // テレメトリ: 独自フィールドvocIndexを追加（第5章）。

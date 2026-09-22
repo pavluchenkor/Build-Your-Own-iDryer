@@ -21,7 +21,7 @@ Verifique em ordem — cada ponto depende dos anteriores.
 |---|---|---|
 | 1 | Alimentação | 12 V na linha do ventilador, 5 V após buck, 3,3 V no sensor |
 | 2 | Sensor vivo | no log serial índice ~100 em ar limpo, cresce de respiro |
-| 3 | Dispositivo Online | status no portal após vinculação por PIN |
+| 3 | Dispositivo Online | status no portal após a vinculação no app |
 | 4 | Telemetria | `vocIndex` e `fanStatus` no fluxo do dispositivo |
 | 5 | Cartão | células VOC e Ventilador, lista Mode, campo Threshold |
 | 6 | Comando do portal | Mode → `on`: ventilador ligou, cartão mostrou "Lig" |
@@ -33,7 +33,7 @@ Verifique em ordem — cada ponto depende dos anteriores.
 Filtro pronto. Adiante — por gosto:
 
 - **Mais entidades**: botão "soprar 5 minutos" (`card().button(...)`), segundo sensor, contador de horas do filtro com lembrete de troca;
-- **Layout bonito**: você já viu o `layoutRow` de fábrica; o cartão também poderá ser organizado em um editor no portal;
+- **Layout bonito**: você já viu o `layoutRow` de fábrica;
 - **Seus dispositivos**: toda esta seção — é um template. Mude o sensor, mecanismo de acionamento e lógica — e pelo mesmo esquema monte umidificador, exaustor, controlador de qualquer coisa. O manifesto fará a interface sozinho.
 
 Se algo não funciona — [Erros típicos](../08-common-mistakes/01-power-mistakes.md).

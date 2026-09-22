@@ -122,6 +122,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);  // 风机开关引脚——输出
 
     s_link.begin();
+    // 设备在门户上被解绑：清除密钥，等待重新绑定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // 遥测：自定义vocIndex字段（第5章）。
@@ -263,6 +265,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);
 
     s_link.begin();                   // Wi-Fi、MQTT、绑定——全在里面
+    // 设备在门户上被解绑：清除密钥，等待重新绑定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // 遥测：添加自定义vocIndex字段（第5章）。

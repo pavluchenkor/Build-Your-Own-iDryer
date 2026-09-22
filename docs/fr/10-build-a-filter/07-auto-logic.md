@@ -122,6 +122,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);  // broche de la clé du ventilateur — en sortie
 
     s_link.begin();
+    // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Télémétrie: votre champ vocIndex (chapitre 5).
@@ -263,6 +265,8 @@ void setup() {
     pinMode(FAN_PIN, OUTPUT);
 
     s_link.begin();                   // Wi-Fi, MQTT, attachement — tout dedans
+    // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Télémétrie: ajout du champ vocIndex personnel (chapitre 5).

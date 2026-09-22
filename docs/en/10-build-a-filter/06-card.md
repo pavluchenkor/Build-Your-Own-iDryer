@@ -93,6 +93,8 @@ static void onThresholdChanged(float v) {}
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // The portal unlinked the device: erase the secret, wait for a new pairing.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetry: custom vocIndex field (chapter 5).
@@ -129,7 +131,7 @@ The order of entities on the card — order of their declaration in `setup()`.
 
 ## 3. Custom card layout (optional)
 
-First — how the card is structured. A card is a vertical stack of **rows**. A row is a horizontal strip with one to four entities; they divide the width evenly: one entity in a row takes the full width, two — half each, three — a third each.
+First — how the card is structured. A card is a vertical stack of **rows**. A row of sensor cells divides the width evenly: one cell takes the full width, two — half each, three — a third each. Controls (list, field, button) in a row are stacked one under another at full width.
 
 The automatic layout from the previous section arranges entities into these rows automatically. If you want to decide yourself what goes next to what — set the rows manually with `layoutRow` calls. One call = one row, order of calls = order of rows from top to bottom:
 
@@ -137,7 +139,7 @@ The automatic layout from the previous section arranges entities into these rows
 // Row 1: two cells — VOC index and fan, each half width.
 s_link.card().layoutRow("voc", "fan");
 
-// Row 2: two controls — mode and threshold, also half each.
+// Row 2: two controls — mode and threshold, one under the other.
 s_link.card().layoutRow("mode", "threshold");
 ```
 
@@ -149,8 +151,11 @@ On the card this will give this arrangement:
 ┌─ DIY Air Filter ────────────────┐
 │  VOC index        │  Fan        │   ← row 1: voc, fan
 │  103              │  Off        │
-├───────────────────┼─────────────┤
-│  Mode      [auto ▾] │ Threshold [150] │   ← row 2: mode, threshold
+├───────────────────┴─────────────┤
+│  Mode                           │   ← row 2: mode, threshold
+│  [auto                       ▾] │
+│  VOC threshold                  │
+│  [150                         ] │
 └─────────────────────────────────┘
 ```
 
@@ -181,13 +186,16 @@ You don't need to understand this JSON — the core generates it from your calls
 
 ## 5. Verification
 
-Flash and open the device on the portal:
+Flash and open the dashboard on the portal:
 
 - cell **VOC index** shows live index (blow on the sensor — the number grows on the next update);
 - cell **Fan** — On/Off;
-- **Mode** — dropdown list, **VOC threshold** — field with a submit button.
+- **Mode** — dropdown list, **VOC threshold** — number field: the value is sent about 0.6 s after you change it, without a confirm button. The list and the field start from the first option and the minimum — they send commands and do not show the current device setting; the state is shown by the cells (for example, the fan).
 
 Selecting a mode or threshold does nothing yet — the callbacks are stubs. We'll bring them to life in [the next chapter](07-auto-logic.md).
 
 !!! note "This is that very concept"
     Notice what happened: you described the interface with five lines in the firmware — and it appeared on the portal and in the app. The same technique works for any of your devices: only id, captions, and callbacks change.
+
+!!! note "Operations with a start and a stop"
+    A list, a field and a button send a value right away. Operations with a start and a stop — drying, heating, lighting — are declared as card **actions** with a mode and launch parameters: the card shows a start form and, while the operation runs, a session block with a Stop button. Example — [chapter 7](../09-build-a-device/07-heating-control.md) of the cabinet section.

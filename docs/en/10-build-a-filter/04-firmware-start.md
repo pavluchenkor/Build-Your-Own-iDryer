@@ -1,11 +1,11 @@
 ---
 title: "Smart filter: firmware startup and portal linking"
-description: "Filter firmware skeleton on idryer-core: non-standard device Config, first startup, PIN-based account linking."
+description: "Filter firmware skeleton on idryer-core: non-standard device Config, first startup, linking to the account in the app."
 ---
 
 # Firmware startup
 
-The project skeleton completely repeats [the chapter from the cabinet example](../09-build-a-device/04-firmware-start.md): PlatformIO, `secrets.h`, `idryer-core` in `lib/`, same `platformio.ini` (replace only the environment name with `filter`). Here — only what's different.
+The project skeleton completely repeats [the chapter from the cabinet example](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` in `lib/`, same `platformio.ini` (replace only the environment name with `filter`). Here — only what's different.
 
 ## Config: non-standard device type
 
@@ -33,6 +33,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // The portal unlinked the device: erase the secret, wait for a new pairing.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -51,16 +53,12 @@ Note: there is no "hasVoc" flag in `Config`. The vocabulary `has*` describes per
 
 ## First startup and linking
 
-The procedure is no different from the cabinet example:
+The procedure is the same as for the cabinet:
 
-1. Flash the board, open Serial Monitor.
-2. The device will raise Wi-Fi (data from `secrets.h`), register, and print the PIN:
-   ```text
-   [CLOUD] PIN: 1234567 (expires in 600s)
-   ```
-3. On the [portal](https://portal.idryer.org/) — "Add device" → enter the PIN.
-4. After linking, `Device claimed!` will appear in the log, the device will go `Online`.
+1. Flash the board and open Serial Monitor: until the device has Wi-Fi, the log is silent.
+2. In the iDryer app: **Connect a new device** → the **Wi-Fi** step (network and password, **Connect device**) → the **Pairing** step → **Pair**.
+3. After **Device paired**, the device is linked to your account and goes `Online` on the portal; the log shows `MQTT: Connected!`.
 
-Detailed breakdown of linking, Wi-Fi errors, and re-linking — in [the chapter of the cabinet example](../09-build-a-device/04-firmware-start.md).
+Details, possible errors and re-pairing — in [the chapter of the cabinet example](../09-build-a-device/04-firmware-start.md).
 
 The device is already visible on the portal, but the card is still almost empty — there's no data yet. Let's connect the sensor.

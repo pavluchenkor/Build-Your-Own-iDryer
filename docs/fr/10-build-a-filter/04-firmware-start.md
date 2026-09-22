@@ -1,11 +1,11 @@
 ---
 title: "Filtre d'air intelligent : démarrage du firmware et attachement au portail"
-description: "Charpente du firmware du filtre sur idryer-core : Config pour type d'appareil non-standard, premier démarrage, attachement au compte par PIN."
+description: "Charpente du firmware du filtre sur idryer-core : Config pour type d'appareil non-standard, premier démarrage, association au compte dans l'application."
 ---
 
 # Démarrage du firmware
 
-La charpente du projet répète complètement [le chapitre de l'exemple avec l'armoire](../09-build-a-device/04-firmware-start.md) : PlatformIO, `secrets.h`, `idryer-core` dans `lib/`, même `platformio.ini` (changez juste le nom de l'environnement en `filter`). Ici — juste ce qui diffère.
+La charpente du projet répète complètement [le chapitre de l'exemple avec l'armoire](../09-build-a-device/04-firmware-start.md) : PlatformIO, `idryer-core` dans `lib/`, même `platformio.ini` (changez juste le nom de l'environnement en `filter`). Ici — juste ce qui diffère.
 
 ## Config : appareil de type non-standard
 
@@ -33,6 +33,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -51,16 +53,12 @@ Remarquez : il n'y a pas de drapeau « hasVoc » dans `Config`. Le dictionnaire 
 
 ## Premier démarrage et attachement
 
-La procédure ne diffère pas de l'exemple avec l'armoire :
+La procédure est la même que pour l'armoire :
 
-1. Flashez la carte, ouvrez Serial Monitor.
-2. L'appareil activera le Wi-Fi (données de `secrets.h`), s'enregistrera et affichera un PIN :
-   ```text
-   [CLOUD] PIN: 1234567 (expires in 600s)
-   ```
-3. Sur le [portail](https://portal.idryer.org/) — « Ajouter un appareil » → saisissez le PIN.
-4. Après l'attachement, le log affichera `Device claimed!`, l'appareil passera en `Online`.
+1. Flashez la carte et ouvrez le Serial Monitor : tant que l'appareil n'a pas de Wi-Fi, le journal reste muet.
+2. Dans l'application iDryer : **Connecter un nouvel appareil** → étape **Wi-Fi** (réseau et mot de passe, **Connecter l’appareil**) → étape **Association** → **Associer**.
+3. Après **Appareil associé**, l'appareil est associé à votre compte et passe `Online` sur le portail ; le journal affiche `MQTT: Connected!`.
 
-Explication détaillée de l'attachement, erreurs Wi-Fi et réattachement — dans [le chapitre de l'exemple avec l'armoire](../09-build-a-device/04-firmware-start.md).
+Détails, erreurs possibles et nouvelle association — dans [le chapitre de l'exemple de l'armoire](../09-build-a-device/04-firmware-start.md).
 
 Sur le portail, l'appareil est déjà visible, mais la fiche est presque vide — il n'y a pas de données encore. Allons connecter le capteur.

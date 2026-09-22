@@ -16,7 +16,7 @@ El filtro aquí es solo un ejemplo. El enfoque mostrado funciona para **cualquie
 Esto funciona gracias al mecanismo de **tarjetas dinámicas** (entity manifest): el dispositivo publica una descripción legible por máquina de "qué mostrar y cómo controlar", y el portal y la aplicación construyen la interfaz según esa descripción. Cómo se ve en el código — [capítulo sobre la tarjeta](06-card.md).
 
 !!! note "Qué significa esto en la práctica"
-    Ideaste un dispositivo → lo armaste en ESP32 → describiste los sensores y botones en el firmware → lo vinculaste a tu cuenta por PIN. Listo: el dispositivo tiene interfaz en el portal y en la aplicación. Distancia de la idea a "controlar desde el smartphone" — una noche.
+    Ideaste un dispositivo → lo armaste en ESP32 → describiste los sensores y botones en el firmware → lo vinculaste a tu cuenta en la aplicación. Listo: el dispositivo tiene interfaz en el portal y en la aplicación. Distancia de la idea a "controlar desde el smartphone" — una noche.
 
 ## Qué exactamente construimos
 

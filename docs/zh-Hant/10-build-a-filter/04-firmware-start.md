@@ -1,11 +1,11 @@
 ---
 title: "智慧濾清器：韌體啟動與入口網站綁定"
-description: "濾清器韌體框架在 idryer-core 上：非標準裝置型別的 Config、首次啟動、透過 PIN 碼綁定到帳戶。"
+description: "濾清器韌體框架在 idryer-core 上：非標準裝置型別的 Config、首次啟動、在應用程式中綁定到帳戶。"
 ---
 
 # 韌體啟動
 
-專案框架完全重複[機櫃範例的章節](../09-build-a-device/04-firmware-start.md)：PlatformIO、`secrets.h`、`lib/` 中的 `idryer-core`、相同的 `platformio.ini`（只需將環境名稱改為 `filter`）。這裡只是差異部分。
+專案框架完全重複[機櫃範例的章節](../09-build-a-device/04-firmware-start.md)：PlatformIO、`lib/` 中的 `idryer-core`、相同的 `platformio.ini`（只需將環境名稱改為 `filter`）。這裡只是差異部分。
 
 ## Config：非標準裝置型別
 
@@ -33,6 +33,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // 裝置在門戶上被解除綁定：清除金鑰，等待重新綁定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -51,16 +53,12 @@ void loop() {
 
 ## 首次啟動和綁定
 
-程序與機櫃範例中的沒有區別：
+步驟與儲料櫃相同：
 
-1. 燒錄韌體到主板，打開序列監視器。
-2. 裝置連上 Wi-Fi（使用 `secrets.h` 中的設定），完成註冊並輸出 PIN：
-   ```text
-   [CLOUD] PIN: 1234567 (expires in 600s)
-   ```
-3. 在[入口網站](https://portal.idryer.org/)——「新增裝置」→ 輸入 PIN。
-4. 綁定後，日誌中會出現 `Device claimed!`，裝置會轉到 `Online`。
+1. 燒錄開發板並開啟序列埠監視器：裝置連上 Wi-Fi 之前，日誌不會輸出。
+2. 在 iDryer 應用程式中：**连接新设备** → **Wi-Fi** 步驟（網路和密碼，**连接设备**）→ **绑定** 步驟 → **绑定**。
+3. 顯示 **设备已绑定** 後，裝置已綁定到你的帳戶，並在入口網站上變為 `Online`；日誌中出現 `MQTT: Connected!`。
 
-詳細的綁定解析、Wi-Fi 錯誤和重新綁定——見[機櫃範例的章節](../09-build-a-device/04-firmware-start.md)。
+詳細說明、可能的錯誤和重新綁定——見[儲料櫃範例的章節](../09-build-a-device/04-firmware-start.md)。
 
 裝置在入口網站上已經可見，但卡片現在幾乎是空的——還沒有資料。接著來連接感測器。

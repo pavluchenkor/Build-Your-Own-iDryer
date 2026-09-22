@@ -93,6 +93,8 @@ static void onThresholdChanged(float v) {}
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetrie: eigenes Feld vocIndex (Kapitel 5).
@@ -129,7 +131,7 @@ Reihenfolge der Entities auf der Karte – Reihenfolge ihrer Deklaration in `set
 
 ## 3. Eigenes Karten-Layout (optional)
 
-Zuerst – wie die Karte aufgebaut ist. Karte – das ist ein vertikaler Stapel **Reihen**. Reihe – eine waagerechte Bahn mit einer bis vier Entities; sie teilen Breite gleichmäßig: eine Entity in Reihe besetzt ganze Breite, zwei – je Hälfte, drei – je Drittel.
+Zuerst — wie die Karte aufgebaut ist. Eine Karte ist ein vertikaler Stapel von **Reihen**. Eine Reihe von Sensorzellen teilt die Breite gleichmäßig: eine Zelle nimmt die ganze Breite, zwei je die Hälfte, drei je ein Drittel. Bedienelemente (Liste, Feld, Schaltfläche) in einer Reihe stehen untereinander in voller Breite.
 
 Das automatische Layout aus vorherigem Abschnitt verteilt Entities auf diese Reihen selbst. Wenn Sie selbst entscheiden wollen, was mit was in einer Reihe steht – vorgeben Sie Reihen mit `layoutRow`-Aufrufen. Ein Aufruf = eine Reihe, Reihenfolge der Aufrufe = Reihenfolge sichtbar oben nach unten:
 
@@ -137,7 +139,7 @@ Das automatische Layout aus vorherigem Abschnitt verteilt Entities auf diese Rei
 // Reihe 1: zwei Zellen – VOC-Index und Lüfter, jede je Hälfte Breite.
 s_link.card().layoutRow("voc", "fan");
 
-// Reihe 2: zwei Steuerelemente – Modus und Schwelle, auch je Hälfte.
+// Reihe 2: zwei Bedienelemente — Modus und Schwelle, untereinander.
 s_link.card().layoutRow("mode", "threshold");
 ```
 
@@ -149,8 +151,11 @@ Auf der Karte gibt das folgendes Layout:
 ┌─ DIY Air Filter ────────────────┐
 │  VOC index        │  Lüfter │   ← Reihe 1: voc, fan
 │  103              │  Aus     │
-├───────────────────┼─────────┤
-│  Modus      [auto ▾] │ Schwelle [150] │   ← Reihe 2: mode, threshold
+├───────────────────┴─────────┤
+│  Mode                           │   ← Reihe 2: mode, threshold
+│  [auto                       ▾] │
+│  VOC threshold                  │
+│  [150                         ] │
 └─────────────────────────────────┘
 ```
 
@@ -181,13 +186,16 @@ Das JSON zu verstehen ist nicht nötig – der Kern generiert es aus Ihren Aufru
 
 ## 5. Überprüfung
 
-Programmieren Sie und öffnen das Gerät im Portal:
+Flashen Sie und öffnen Sie das Dashboard des Portals:
 
 - Zelle **VOC index** zeigt Live-Index (pusten Sie auf Sensor – Zahl wächst beim nächsten Update);
 - Zelle **Lüfter** – An/Aus;
-- **Mode** – Dropdown-Liste, **VOC threshold** – Feld mit Send-Button.
+- **Mode** — Dropdown-Liste, **VOC threshold** — Zahlenfeld: der Wert wird etwa 0,6 s nach der Änderung gesendet, ohne Bestätigungsknopf. Liste und Feld beginnen mit der ersten Option und dem Minimum — sie senden Befehle und zeigen nicht die aktuelle Einstellung des Geräts; den Zustand zeigen die Zellen (zum Beispiel der Lüfter).
 
 Modus- und Schwellen-Wahl macht noch nichts – die Callbacks sind Stubs. Wir erwecken sie im [nächsten Kapitel](07-auto-logic.md) zum Leben.
 
 !!! note "Das ist genau das Konzept"
     Beachten Sie, was passierte: Sie beschrieben die Benutzeroberfläche in fünf Zeilen Firmware – und sie erschien im Portal und in der App. Gleicher Trick funktioniert für jedes Ihre Gerät: wechseln sich nur ids, Beschriftungen und Callbacks.
+
+!!! note "Operationen mit Start und Stopp"
+    Liste, Feld und Schaltfläche senden einen Wert sofort. Operationen mit Start und Stopp — Trocknen, Heizen, Beleuchtung — werden als **Aktionen** der Karte mit Modus und Startparametern deklariert: die Karte zeigt ein Startformular und, solange die Operation läuft, einen Sitzungsblock mit Stopp-Schaltfläche. Beispiel — [Kapitel 7](../09-build-a-device/07-heating-control.md) im Abschnitt zum Schrank.

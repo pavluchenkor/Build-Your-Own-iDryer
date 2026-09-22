@@ -93,6 +93,8 @@ static void onThresholdChanged(float v) {}
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     initVocSensor();
 
     // Telemetrické údaje: vlastní pole vocIndex (kapitola 5).
@@ -129,7 +131,7 @@ Pořadí entit na kartě odpovídá pořadí jejich deklarace v `setup()`.
 
 ## 3. Vlastní rozvržení karty (volitelné)
 
-Nejprve — jak je karta strukturována. Karta je svislý sloupec **řádků**. Řádek je vodorovný pás s jednou až čtyřmi entitami; šířku karty si dělí rovnoměrně: jedna entita zabere celou šířku, dvě po polovině, tři po třetině.
+Nejprve — jak je karta uspořádaná. Karta je svislý sloupec **řádků**. Řádek buněk se senzory dělí šířku rovnoměrně: jedna buňka zabere celou šířku, dvě po polovině, tři po třetině. Ovládací prvky (seznam, pole, tlačítko) v řádku se skládají pod sebe na celou šířku.
 
 Automatické rozvržení z předchozí sekce entity po těchto řádcích rozloží samo. Chcete-li sami rozhodovat, co s čím stojí vedle sebe, nastavte řádky ručně voláními `layoutRow`. Jedno volání = jeden řádek, pořadí volání = pořadí řádků shora dolů:
 
@@ -137,7 +139,7 @@ Automatické rozvržení z předchozí sekce entity po těchto řádcích rozlo�
 // Řádek 1: dvě buňky — VOC index a ventilátor, každá po polovině šířky.
 s_link.card().layoutRow("voc", "fan");
 
-// Řádek 2: dva ovládací prvky — režim a práh, taky po polovině.
+// Řádek 2: dva ovládací prvky — režim a práh, pod sebou.
 s_link.card().layoutRow("mode", "threshold");
 ```
 
@@ -149,8 +151,11 @@ Na kartě to vytvoří toto rozvržení:
 ┌─ DIY Air Filter ────────────────┐
 │  VOC index        │  Ventilátor │   ← řádek 1: voc, fan
 │  103              │  Vyp        │
-├───────────────────┼─────────────┤
-│  Mode      [auto ▾] │ Threshold [150] │   ← řádek 2: mode, threshold
+├───────────────────┴─────────────┤
+│  Mode                           │   ← řádek 2: mode, threshold
+│  [auto                       ▾] │
+│  VOC threshold                  │
+│  [150                         ] │
 └─────────────────────────────────┘
 ```
 
@@ -181,13 +186,16 @@ Tento JSON rozebírat nemusíte — jádro jej generuje z vašich volání. Je a
 
 ## 5. Ověření
 
-Nahrajte firmware a otevřete zařízení v portálu:
+Nahrajte firmware a otevřete dashboard portálu:
 
 - dlaždice **VOC index** zobrazuje živý index (vydechněte na senzor — při příštím obnovení číslo vzroste);
 - dlaždice **Ventilátor** — Zap/Vyp;
-- **Mode** — rozbalovací seznam, **VOC threshold** — pole s tlačítkem odeslání.
+- **Mode** — rozbalovací seznam, **VOC threshold** — číselné pole: hodnota se odešle asi 0,6 s po změně, bez potvrzovacího tlačítka. Seznam a pole začínají první možností a minimem — posílají příkazy a neukazují aktuální nastavení zařízení; stav ukazují buňky (například ventilátor).
 
 Výběr režimu a prahu zatím nic nedělá — to jsou prázdné zástupce callbacků. Oživíme je v [následující kapitole](07-auto-logic.md).
 
 !!! note "To je právě ta koncepce"
     Všimněte si, co se stalo: popsali jste rozhraní pěti řádky v programu — a objevilo se v portálu i v aplikaci. Stejný postup funguje pro jakékoli vaše zařízení: mění se jen id, popisky a callbacky.
+
+!!! note "Operace se spuštěním a zastavením"
+    Seznam, pole a tlačítko posílají hodnotu hned. Operace se spuštěním a zastavením — sušení, ohřev, osvětlení — se deklarují jako **akce** karty s režimem a parametry spuštění: karta ukáže formulář spuštění a během operace blok relace s tlačítkem zastavení. Příklad — [kapitola 7](../09-build-a-device/07-heating-control.md) části o skříni.

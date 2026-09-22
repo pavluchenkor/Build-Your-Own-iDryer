@@ -21,7 +21,7 @@ Verifica en orden — cada punto se basa en los anteriores.
 |---|---|---|
 | 1 | Alimentación | 12 V en la línea del ventilador, 5 V después del buck, 3.3 V en el sensor |
 | 2 | Sensor activo | en el registro Serial índice ~100 en aire limpio, crece del aliento |
-| 3 | Dispositivo En línea | estado en el portal después de vinculación por PIN |
+| 3 | Dispositivo En línea | estado en el portal después de vincularlo en la aplicación |
 | 4 | Telemetría | `vocIndex` y `fanStatus` en el flujo del dispositivo |
 | 5 | Tarjeta | celdas VOC y Ventilador, lista Mode, campo Threshold |
 | 6 | Comando desde portal | Mode → `on`: ventilador se encendió, tarjeta muestra "Encendido" |
@@ -33,7 +33,7 @@ Verifica en orden — cada punto se basa en los anteriores.
 El filtro está listo. Después — según el gusto:
 
 - **Más entidades**: botón "purgar 5 minutos" (`card().button(...)`), segundo sensor, contador de horas de filtro con aviso de reemplazo;
-- **Diseño bonito**: el `layoutRow` de fábrica que ya viste; la tarjeta también se podrá componer en editor en el portal;
+- **Diseño bonito**: el `layoutRow` de fábrica que ya viste;
 - **Tus propios dispositivos**: toda esta sección es una plantilla. Cambia el sensor, el mecanismo y la lógica — y por el mismo esquema construyes humidificador, extractor, controlador de lo que sea. El manifest hará el interface por sí solo.
 
 Si algo no funciona — [Errores típicos](../08-common-mistakes/01-power-mistakes.md).

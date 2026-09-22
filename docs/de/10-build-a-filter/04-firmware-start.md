@@ -1,11 +1,11 @@
 ---
 title: "Intelligenter Filter: Firmware-Start und Bindung ans Portal"
-description: "Filter-Firmware-Gerüst auf idryer-core: Config für Gerätetyp unbekannt, Erste Inbetriebnahme, PIN-Bindung ans Nutzerkonto."
+description: "Filter-Firmware-Gerüst auf idryer-core: Config für Gerätetyp unbekannt, erste Inbetriebnahme, Kopplung mit dem Konto in der App."
 ---
 
 # Firmware-Start
 
-Das Projekt-Gerüst wiederholt vollständig [das Kapitel aus dem Gehäuse-Beispiel](../09-build-a-device/04-firmware-start.md): PlatformIO, `secrets.h`, `idryer-core` in `lib/`, gleiches `platformio.ini` (ersetzen Sie nur die Umgebung auf `filter`). Hier – nur das, was anders ist.
+Das Projekt-Gerüst wiederholt vollständig [das Kapitel aus dem Gehäuse-Beispiel](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` in `lib/`, gleiches `platformio.ini` (ersetzen Sie nur die Umgebung auf `filter`). Hier – nur das, was anders ist.
 
 ## Config: Gerät unbekannten Typs
 
@@ -33,6 +33,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -51,16 +53,12 @@ Achten Sie darauf: In `Config` gibt es kein Flag „hasVoc". Das Wörterbuch `ha
 
 ## Erste Inbetriebnahme und Bindung
 
-Das Verfahren unterscheidet sich nicht vom Gehäuse-Beispiel:
+Der Ablauf ist derselbe wie beim Schrank:
 
-1. Programmieren Sie die Platine, öffnen Sie den Serial Monitor.
-2. Das Gerät hebt Wi-Fi auf (Daten aus `secrets.h`), registriert sich und druckt die PIN:
-   ```text
-   [CLOUD] PIN: 1234567 (expires in 600s)
-   ```
-3. Auf dem [Portal](https://portal.idryer.org/) – „Gerät hinzufügen" → PIN eingeben.
-4. Nach der Bindung erscheint `Device claimed!` im Log, das Gerät wechselt zu `Online`.
+1. Flashen Sie die Platine und öffnen Sie den Serial Monitor: solange das Gerät kein WLAN hat, bleibt das Log still.
+2. In der iDryer-App: **Neues Gerät verbinden** → Schritt **WLAN** (Netz und Passwort, **Gerät verbinden**) → Schritt **Kopplung** → **Koppeln**.
+3. Nach **Gerät gekoppelt** ist das Gerät mit Ihrem Konto gekoppelt und geht im Portal `Online`; im Log steht `MQTT: Connected!`.
 
-Detaillierte Analyse der Bindung, Wi-Fi-Fehler und Neu-Bindung – im [Kapitel des Gehäuse-Beispiels](../09-build-a-device/04-firmware-start.md).
+Details, mögliche Fehler und erneutes Koppeln — im [Kapitel des Schrank-Beispiels](../09-build-a-device/04-firmware-start.md).
 
 Das Gerät ist bereits im Portal sichtbar, aber die Karte ist noch fast leer – wir haben ja noch keine Daten. Gehen wir den Sensor anschließen.

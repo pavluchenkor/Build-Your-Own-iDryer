@@ -21,7 +21,7 @@ description: "Filter-Zusammenbau in Gehäuse, Reihenfolge der Filter-Schichten u
 |---|---|---|
 | 1 | Stromversorgung | 12 V an Lüfter-Leitung, 5 V nach buck, 3,3 V am Sensor |
 | 2 | Sensor lebt | im Serial-Log Index ~100 in reiner Luft, wächst von Atemluft |
-| 3 | Gerät Online | Status im Portal nach PIN-Bindung |
+| 3 | Gerät Online | Status im Portal nach der Kopplung in der App |
 | 4 | Telemetrie | `vocIndex` und `fanStatus` im Gerätestrom |
 | 5 | Karte | VOC- und Lüfter-Zellen, Liste Mode, Feld Threshold |
 | 6 | Befehl vom Portal | Mode → `on`: Lüfter lief an, Karte zeigte „An" |
@@ -33,7 +33,7 @@ description: "Filter-Zusammenbau in Gehäuse, Reihenfolge der Filter-Schichten u
 Filter ist bereit. Dann – nach Geschmack:
 
 - **Mehr Entities**: Button „Produktblase 5 Minuten" (`card().button(...)`), zweiter Sensor, Lüfter-Betriebsstunden-Zähler mit Austausch-Erinnerung;
-- **Schönes Layout**: Fabrik-`layoutRow` Sie schon sahen; Karte kann später auch im Portal-Editor zusammengebaut werden;
+- **Schönes Layout**: Fabrik-`layoutRow` Sie schon sahen;
 - **Ihre Geräte**: Dieser ganze Abschnitt – Schablone. Ersetzen Sie Sensor, Stellglied und Logik – und bauen Sie nach gleicher Schablone Befeuchter, Abluft-Controller, Steuerung von Allem auf. Das Manifest macht Interface selbst.
 
 Falls etwas nicht anspringt – [Typische Fehler](../08-common-mistakes/01-power-mistakes.md).
