@@ -1,338 +1,135 @@
+<div align="center">
+
+<img src="docs/img/iDryer_logo_small.png" width="220" alt="iDryer">
+
 # Build Your Own iDryer
 
-## Purpose
+**Your own device on ESP32. Portal, app, push: all of it is ready, you write only the logic.**
 
-This repository contains practical documentation for people who want to build their own device using the iDryer ecosystem.
+[![Documentation](https://img.shields.io/badge/docs-idryer.org-e7352c)](https://docs.idryer.org/en/development/byod/) [![Telegram](https://img.shields.io/badge/Telegram-iDryer-2ca5e0)](https://t.me/iDryer) [![Discord](https://img.shields.io/badge/Discord-join-5865f2)](https://discord.gg/jGce5eeHHz) [![License](https://img.shields.io/badge/license-Apache--2.0%20%2F%20CC%20BY%204.0-blue)](LICENSE.txt)
 
-The main goal is simple:
-
-Help a person without an engineering background understand enough to safely build, connect, and maintain a working device.
-
-This is **not** an academic electronics course.
-
-The documentation should be:
-
-- practical;
-- clear without special training;
-- usable immediately;
-- written for a regular user, not only for an engineer.
+</div>
 
 ---
 
-## Who This Is For
+## What this is
 
-This section is for users who:
+A set of end-to-end examples and the course that goes with them. Each example is a complete device built on the `idryer-core` library, brought to a working state and connected to the [iDryer portal](https://portal.idryer.org/).
 
-- have little or no electronics experience;
-- want to build their own device;
-- are not confident with programming or hardware;
-- prefer step-by-step instructions.
+Build a device on the core and you get the whole infrastructure at once: portal, authentication, device binding, secured communication, telemetry, charts, over-the-air updates. None of that has to be written.
 
----
+## Who this is for
 
-## Core Principles
+- **You are a developer and you need a portal, not a backend.** You have a device idea and an ESP32, and no interest in writing a server, an auth system and a mobile app. The core hands you all of it, finished.
+- **You are building your first device.** Electronics is still unfamiliar, but you want to understand what connects to what and why, instead of copying someone else's schematic. The course takes you from a current calculation to working firmware.
+- **You need a device that does not exist yet.** A humidifier, a fume extractor, a warehouse monitor. The ecosystem does not keep a list of allowed devices: declare your sensors and the device is in the portal.
 
-All pages in this section follow these principles:
+## What you write and what the core does
 
-1. Explain only what is needed.
+You write only what is specific to your device: reading sensors, driving the load, the operating logic. That is hundreds of lines, not thousands. In the finished storage cabinet example the main file is **125 lines**.
 
-- no unnecessary theory;
-- only what is useful for the build.
+Everything else is handled by `idryer-core`: Wi-Fi connection, binding to an account, the secured MQTT session, telemetry publishing, command handling, updates. You never write the network stack.
 
-2. Always show practical use.
+## The device shows up in the portal by itself
 
-- practical wiring examples;
-- real connections;
-- common user mistakes.
+This is the key difference from ordinary DIY.
 
-3. Safety comes first.
+In the firmware you declare which sensors and controls the device has, one or two lines each. The portal builds the device card from that description on its own: live readings, buttons, input fields.
 
-This is especially important for:
+Not a line of code on the portal side. No approvals, no pull requests. A device the iDryer ecosystem has never seen before, a humidifier, a part cooling station, a fume extractor controller, a warehouse monitor, gets a working interface.
 
-- mains voltage;
-- heaters;
-- SSR modules;
-- power supplies;
-- wiring and insulation.
+> The automatic card currently works in the web portal. The same rendering is planned for the mobile app but is not implemented yet.
 
-4. The text should be clear on the first read.
+→ [How this is done in code](https://docs.idryer.org/en/development/byod/10-build-a-filter/06-card/)
 
-- no complicated wording;
-- no long explanations that do not help the build.
+## Ready examples
 
-5. One page covers one topic.
+### Filament storage cabinet
 
----
+A closed cabinet for 10-40 spools with gentle heat at 40-45 °C that keeps filament dry. A single ESP32 does everything: reads the climate, drives the heater and the fan, keeps the link to the portal.
 
-## Documentation Structure
+The example covers the full path: concept, parts list, wiring diagram, first firmware, sensors, menu, heater control, assembly and checkout.
 
-The documentation is stored in language folders:
+→ [Build the cabinet](https://docs.idryer.org/en/development/byod/09-build-a-device/01-concept/)
 
-```text
-docs/
-├── ru/
-├── en/
-├── de/
-├── fr/
-├── es/
-├── cs/
-├── ja/
-├── pt/
-├── pt-BR/
-├── zh/
-└── zh-Hant/
-```
+### Smart air filter
 
-Russian (`docs/ru`) is the source language. Other languages are translated from it.
+A box with a fan, a HEPA filter and a carbon layer. It measures air quality with a VOC sensor, turns itself on when the air is dirty and off once it is clean. The mode and the trigger threshold are set from the portal.
 
-The main content sections are:
+ABS and ASA give off styrene while printing, resins have a bouquet of their own. A filter next to the printer is hygiene, not luxury.
 
-```text
-00-start-here/
-01-electronics-basics/
-02-controllers/
-03-common-components/
-04-thermal-physics-and-materials/
-05-tools/
-06-practical-guides/
-07-3d-printing/
-08-common-mistakes/
-```
+This example shows the main point: a device that does not exist in the ecosystem at all gets a full device card in the portal.
 
-There is also a local planning file:
+→ [Build the filter](https://docs.idryer.org/en/development/byod/10-build-a-filter/01-concept/)
 
-```text
-00-карта-раздела.md
-```
+## If electronics is still unfamiliar
 
-It is a working map of the Russian section. It is useful for planning and review, but it is not part of the published documentation site.
+The examples are preceded by a full course, from the first current calculation to a working device. It does not replace an electrician and it does not teach circuit design, but it walks you through everything the build requires.
 
----
+| Section | Topics |
+|---|---|
+| Electronics basics | Power, current, load, MOSFET, triac, solid state relay |
+| Controllers | ESP32, Arduino, RP2040, STM32, interfaces, flashing |
+| Components | Heaters, fans, thermistors, servos, load cells, displays, RFID |
+| Thermal physics and materials | Thermal conductivity, convection, material safety |
+| Tools | Multimeter, USB-UART, soldering iron, crimping, ST-Link, oscilloscope |
+| Practice | Connecting a fan, testing a thermistor and the other procedures step by step |
+| 3D printing | Which parts survive next to a heater |
+| Common mistakes | Where to look when it will not turn on, overheats or behaves oddly |
 
-## Required Topics
+Read it in order, or open it as a reference.
 
-### Electronics Basics
+→ [Start here](https://docs.idryer.org/en/development/byod/00-start-here/01-introduction/) · [Common mistakes](https://docs.idryer.org/en/development/byod/08-common-mistakes/01-overview/)
 
-The basics should cover:
+## More examples are coming
 
-- voltage;
-- current;
-- power;
-- resistance;
-- AC and DC;
-- why 24V and mains voltage must not be confused;
-- how to choose a power supply;
-- why power margin matters;
-- what inrush current is.
+This is an open collection. If you built your own device on the core, send in the example and it will sit alongside the rest.
 
----
+Write-ups of failures are just as useful: what did not start, where you got burned, which component turned out to be the wrong one. Stories like that save other people weeks.
 
-### Relays, SSR, and MOSFETs
+## Status
 
-The documentation should explain:
+The course is under active development: chapters are being written, examples are being added. The storage cabinet is built and lives in the portal, the air filter is documented step by step.
 
-- how they differ;
-- when to use each one;
-- why an SSR is not always needed;
-- why a MOSFET does not replace an SSR;
-- why a relay can stick;
-- why an SSR can heat up.
+## Safety
 
----
+> **Devices in this section get hot and run from mains power.** Working with `110-230 V` takes its own discipline and does not forgive haste. Before you power up anything you built yourself, read the safety sections in full.
 
-### Mains Voltage Safety
+The documentation does not replace an electrician and it does not grant permission to build dangerous devices without understanding what you are doing.
 
-This is a critical topic.
+## Place in the ecosystem
 
-It should cover:
+| Layer | What it does | Repository |
+|---|---|---|
+| Course and examples | How to build your own device: **this repository** | Build-Your-Own-iDryer |
+| Core | Library: network, portal, protocol, telemetry | [idryer-core](https://github.com/pavluchenkor/idryer-core) |
+| Production controller | Ready solution for dryers | [iDryerControllerV2](https://github.com/pavluchenkor/iDryerControllerV2) |
+| Cloud | Portal, app, authentication | [portal.idryer.org](https://portal.idryer.org/) |
 
-- why mains voltage is dangerous;
-- how to connect loads safely;
-- grounding;
-- fuses;
-- circuit breakers;
-- wire cross-section;
-- terminals;
-- insulation;
-- mistakes that can destroy equipment or create real danger.
+## What is in the repository
 
----
-
-### Controllers
-
-#### ESP32
-
-Espressif Systems ESP32:
-
-- what it is used for;
-- Wi-Fi;
-- GPIO;
-- PWM;
-- ADC;
-- why it is convenient.
-
-#### Arduino
-
-- why it is widely known;
-- how it differs from ESP32;
-- when it is useful;
-- when ESP32 is a better choice.
-
-#### STM32
-
-STMicroelectronics STM32:
-
-- where it is used;
-- why it is more advanced;
-- why a bootloader matters;
-- what DFU, Boot, and ST-Link mean.
-
----
-
-### USB-UART Adapters
-
-The documentation should explain:
-
-- what a USB-UART adapter is;
-- why it is needed;
-- how to connect it;
-- common RX/TX mistakes;
-- 3.3V and 5V logic levels;
-- how an ESP can be damaged.
-
----
-
-### Components
-
-Each component page should answer:
-
-- what it is;
-- why it is needed;
-- how it connects;
-- what users most often break.
-
-Required components:
-
-- heaters;
-- fans;
-- servos;
-- thermistors;
-- LED strips;
-- OLED displays;
-- TFT / touch screens;
-- load cells;
-- RFID/NFC.
-
----
-
-### Practical Guides
-
-Step-by-step guides should cover:
-
-- connecting an SSR to ESP32;
-- connecting a heater safely;
-- using 24V and mains voltage in one device;
-- connecting a fan;
-- choosing a power supply;
-- correct grounding;
-- handling EMI;
-- diagnosing unstable USB;
-- checking a thermistor;
-- connecting a servo;
-- connecting a load cell;
-- connecting an RFID reader.
-
----
-
-### Tools
-
-#### Multimeter
-
-- how to measure voltage;
-- how to use continuity mode;
-- how not to damage the multimeter.
-
-#### Oscilloscope
-
-- practical use only;
-- how to check PWM;
-- how to check UART;
-- how to inspect noise.
-
-#### ST-Link
-
-- why it is needed;
-- when it is needed;
-- how to flash STM32.
-
-#### USB-TTL
-
-- how to use it;
-- how not to swap RX and TX.
-
-#### Soldering
-
-- soldering wires;
-- soldering JST connectors;
-- soldering thermistors;
-- common mistakes.
-
----
-
-### 3D Printing
-
-This section should cover:
-
-- what STL is;
-- PETG, ABS, and ASA;
-- heat-resistant materials;
-- enclosure design;
-- why PLA is a poor choice for heated enclosures.
-
----
-
-### Common Mistakes
-
-This section should explain:
-
-- why USB does not work;
-- why ESP32 restarts;
-- why an SSR gets very hot;
-- why a fan creates interference;
-- why a thermistor shows nonsense;
-- why a display does not turn on;
-- why a servo breaks the power supply;
-- why the device behaves unstably.
-
----
-
-## Useful External Sources
-
-- **Alex Gyver** — Russian-language educational videos about Arduino, ESP32, PWM, relays, servos, OLED displays, and sensors.
-- **GreatScott!** — English-language videos with a practical engineering view of electronics.
-- **STMicroelectronics** — official STM32 documentation.
-- **Espressif Systems** — official ESP32 documentation.
-- **Arduino** — documentation and beginner examples for microcontrollers.
-
----
-
-## Main Goal
-
-After reading this section, the user should understand what they are doing and why, instead of becoming more confused.
+| Path | What it is |
+|---|---|
+| `example/` | Working example projects, ready to build |
 
 ## License
 
-This repository combines documentation and example source code, licensed
-separately — see [LICENSE.txt](LICENSE.txt) and [NOTICE](NOTICE).
+Documentation is under [CC BY 4.0](LICENSE-Documentation.txt). Source code, including the examples, is under the [Apache License 2.0](LICENSE-Software.txt). Details in [LICENSE.txt](LICENSE.txt) and [NOTICE](NOTICE).
 
-- **Documentation** (all prose, guides, images): [CC BY 4.0](LICENSE-Documentation.txt)
-- **Source code** (including the example firmware under `example/`): [Apache License 2.0](LICENSE-Software.txt)
+The iDryer name is not covered by these licenses: see [TRADEMARKS.md](https://github.com/pavluchenkor/idryer-core/blob/main/TRADEMARKS.md).
 
-Both licenses permit commercial use.
+## Help
 
-The licenses do not grant rights to the iDryer name. Community projects are
-welcome and the naming policy is permissive — see
-[TRADEMARKS.md](https://github.com/pavluchenkor/idryer-core/blob/main/TRADEMARKS.md).
+- [Telegram](https://t.me/iDryer)
+- [Discord](https://discord.gg/jGce5eeHHz)
+- [Documentation](https://docs.idryer.org/en/development/byod/)
 
-Hardware design, CAD files and PCB sources are licensed separately and are not
-covered by this repository.
+Guides and teardowns on the channels: [YouTube](https://www.youtube.com/@iDryerProject) · [Rutube](https://rutube.ru/channel/34401569/)
+
+## Contributing
+
+Send in your examples, extend the course, fix mistakes: open an issue or a pull request.
+
+## Next
+
+[Build the air filter](https://docs.idryer.org/en/development/byod/10-build-a-filter/01-concept/): the shortest path from an idea to a working device.
