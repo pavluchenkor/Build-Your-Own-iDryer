@@ -1,6 +1,6 @@
 ---
 title: "Starting firmware on idryer-core: first launch and device pairing"
-description: "Creating a PlatformIO project based on idryer-core library: platformio.ini, secrets.h, device Config, first ESP32 firmware upload and device pairing to the iDryer portal."
+description: "Creating a PlatformIO project based on the idryer-core library: platformio.ini, device Config, first ESP32 firmware upload, Wi-Fi setup and linking the device to the iDryer portal in the app."
 ---
 
 # Starting firmware on the core
@@ -16,6 +16,7 @@ You will need:
 - VS Code with PlatformIO extension;
 - USB cable;
 - Wi-Fi network `2.4 GHz` (ESP32 does not work with `5 GHz` only networks).
+- a smartphone with the iDryer app, signed in to your iDryer portal account: it gives the device the Wi-Fi network and links it to the account.
 
 For information on what controller firmware is and how it gets into the board — see [Controller firmware](../02-controllers/11-flashing-controller.md).
 
@@ -26,8 +27,6 @@ In PlatformIO a project is a folder with a fixed structure. Create a project fol
 ```text
 my-cabinet/
 ├── platformio.ini        # build settings (fill in step 4)
-├── include/
-│   └── secrets.h         # Wi-Fi login and password (step 3)
 ├── lib/
 │   └── idryer-core/      # core library (symlink or copy)
 └── src/
@@ -44,16 +43,9 @@ ln -s /path/to/idryer-core lib/idryer-core
 
 This is also required for menu generation (chapter 6) — the hook looks for the generator inside `lib/idryer-core/`.
 
-## 3. Create secrets.h
+## 3. Wi-Fi and pairing are not in the code
 
-Copy the `secrets.h.example` example from the library to `include/secrets.h` in your project and specify your network credentials:
-
-```cpp
-#define WIFI_SSID      "your-ssid"
-#define WIFI_PASSWORD  "your-password"
-```
-
-Add `include/secrets.h` to `.gitignore` so the password doesn't end up in the repository.
+The firmware contains neither the network password nor account data. On first start the device has no Wi-Fi and waits for settings: the iDryer app sends them over the air (ESPTouch) and then links the device to your account with a one-time pairing token. The core does all of this inside `s_link.begin()` and `s_link.loop()`, you only go through the steps in the app — section 9.
 
 ## 4. Configure platformio.ini
 
@@ -65,12 +57,11 @@ platform    = espressif32
 framework   = arduino
 board       = esp32-c3-devkitm-1
 
-lib_deps =
-    bblanchon/ArduinoJson @ ^6.21.0
-    knolleary/PubSubClient
-    densaugeo/base64 @ ^1.4.0
-    links2004/WebSockets @ ^2.4.0
-    https://github.com/jnthas/Improv-WiFi-Library.git
+; The core's libraries (MQTT, ArduinoJson, WebSockets, Improv) come
+; from lib/idryer-core/library.json by themselves.
+; ESPAsyncTCP is the ESP8266 transport from espMqttClient's dependencies:
+; it does not build on ESP32 and has to be excluded.
+lib_ignore = ESPAsyncTCP
 
 build_flags =
     -DIDRYER_API_BASE='"https://portal.idryer.org/api"'
@@ -81,8 +72,8 @@ build_flags =
 
 Replace `board` with your board (for example, `esp32-s3-devkitc-1`). You don't need to specify `idryer-core` in `lib_deps` — it's located in `lib/` (step 2).
 
-!!! note "Why all these dependencies"
-    `ArduinoJson`, `PubSubClient`, `base64`, `WebSockets` and `Improv-WiFi-Library` are required by the `idryer-core` library itself (MQTT, WebSocket access over LAN, Wi-Fi provisioning). Without any of them the build will fail with an error like `... .h: No such file`. The `MQTT_BROKER` and `MQTT_PORT` flags are also required — without them the core won't compile (`'MQTT_BROKER' was not declared`).
+!!! note "What these lines do"
+    You don't list the core's dependencies: PlatformIO takes them from `lib/idryer-core/library.json`. `lib_ignore = ESPAsyncTCP` is required — without it the build fails in `ESPAsyncTCP.cpp`. The `MQTT_BROKER` and `MQTT_PORT` flags are also required — without them the core won't compile (`'MQTT_BROKER' was not declared`).
 
 ## 5. Describe the device in Config
 
@@ -129,6 +120,8 @@ In the same file after the `Config` block, add the `setup()` and `loop()` functi
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // The portal unlinked the device: erase the secret, wait for a new pairing.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -136,7 +129,7 @@ void loop() {
 }
 ```
 
-This is enough for the device to connect to Wi-Fi and reach the portal. We'll add sensors in the [Sensors](05-sensors.md) step.
+`s_link.begin()` brings up Wi-Fi, pairing and the connection to the portal. The `revoke` command comes from the portal when the device is unlinked from the account: `handleRevoke()` erases the device secret, and the device waits for a new pairing. We'll add sensors in the [Sensors](05-sensors.md) step.
 
 ### Complete `src/main.cpp` after this chapter
 
@@ -164,6 +157,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // The portal unlinked the device: erase the secret, wait for a new pairing.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -185,36 +180,44 @@ pio run -e cabinet -t upload
 pio device monitor -b 115200
 ```
 
-Expected sequence in the log:
+Until the device has Wi-Fi, the log is silent: the core keeps the serial port for the web installer (Improv). Logs turn on as soon as Wi-Fi is up. On a device that has not been linked yet, the log ends like this:
 
 ```text
-[CLOUD] Connecting to WiFi...
-[CLOUD] WiFi connected, IP: 192.168.1.42
-[CLOUD] Provisioning device...
-[CLOUD] PIN: 1234567 (expires in 600s)
+[BOOT] WiFi ok, logs enabled
+[INFO ] CLOUD: WiFi connected, IP: 192.168.1.42, RSSI: -55 dBm, …
+…
+[INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-If the device stops at the `PIN: ...` line — this is normal. Proceed to pairing.
+Leave the monitor open and go to the app.
 
-## 9. Pair the device with the portal
+## 9. Connect Wi-Fi and link the device in the app
 
-1. Open [portal.idryer.org](https://portal.idryer.org/).
-2. Go to the **Add device** section.
-3. Enter the PIN from Serial Monitor.
+1. Connect the phone to the Wi-Fi network the device will use (`2.4 GHz`) and sign in to the iDryer app with your portal account.
+2. On the home screen, tap **Connect a new device** — the **Wi-Fi** step opens.
+3. Check the network name (the app fills it in when location access is on), enter the password and tap **Connect device**. The app sends the settings for up to 90 seconds; when the device joins the network, the app shows **Device connected**. Tap **Next**.
+4. On the **Pairing** step, tap **Pair**. The app finds the device on the network, gets a one-time pairing token from the portal, hands it to the device and waits until the portal confirms that the device is online.
+5. After **Device paired**, the device appears in the device list on the portal and in the app.
 
-After pairing, the device will transition to `Online` status. The log will show:
+If the device is already on the network, open the **Pairing** step right away — tap its chip at the top of the window.
+
+The log shows the pairing:
 
 ```text
-[CLOUD] Device claimed!
-[CLOUD] MQTT connected!
+[INFO ] CLOUD: binding-v3: pairing token received (… chars)
+[INFO ] CLOUD: binding-v3: activating with pairing token (serial=DEVICE_… mcu=-)
+[INFO ] CLOUD: binding-v3: activated, deviceId=… -> Ready
+…
+[INFO ] MQTT: Connected! …
 ```
 
 ## Verification
 
-At this stage the device should be Online on the portal. There's no sensor data yet — this is expected. If the device doesn't connect:
+At this stage the device should be Online on the portal. There's no sensor data yet — this is expected. If something went wrong:
 
-- verify that the `2.4 GHz` network and password in `secrets.h` are correct;
-- check the ESP32 power supply (voltage drops on startup are a common cause of resets);
+- the app did not see the device join the network — check the password and that the network is `2.4 GHz`; with a wrong password the device waits for settings again, repeat the Wi-Fi step;
+- the app did not find the device on the **Pairing** step — the phone and the device must be on the same network, and the network must not block device discovery (guest networks often do);
+- the device reboots — check the ESP32 power supply (voltage drops on startup are a common cause of resets);
 - see [Power mistakes](../08-common-mistakes/02-power-mistakes.md) and [Controller mistakes](../08-common-mistakes/04-controller-mistakes.md).
 
 ## What's next

@@ -1,6 +1,6 @@
 ---
 title: "Menu do dispositivo em YAML: configurações em NVS e no portal"
-description: "Como descrever o menu do dispositivo em idryer-core em menu.yaml: temperatura-alvo e histerese são salvos em NVS e exibidos com widgets no portal iDryer."
+description: "Como descrever o menu do dispositivo em idryer-core em menu.yaml: temperatura-alvo e histerese são salvos em NVS e exibidos no menu do dispositivo no portal iDryer."
 ---
 
 # Menu em YAML
@@ -14,7 +14,7 @@ Este é um dos blocos-chave do núcleo. Você não escreve código de armazename
 Após os passos anteriores, o dispositivo lê sensores, mas todos os limites estão "codificados" no código. Menu resolve três tarefas de uma vez:
 
 - **armazenamento**: valores sobrevivem ao reinício (NVS);
-- **gerenciamento do portal**: cada parâmetro se torna um widget (slider, alternador);
+- **gerenciamento do portal**: o portal mostra cada item do menu pelo seu tipo (número, chave);
 - **fonte única de verdade**: um arquivo descreve tanto memória quanto interface.
 
 ## Como funciona
@@ -25,7 +25,7 @@ Um arquivo `menu.yaml` passa por um gerador durante a construção:
 menu.yaml → (pio run) → arquivos C++ em src/menu/ + NVS + JSON para portal
 ```
 
-Um item com campo `role:` é visível ao portal e exibido como widget. Um item sem `role:` é privado, apenas para lógica interna do dispositivo.
+O portal desenha cada item do menu pelo seu tipo. `role:` dá ao item um rótulo traduzido do contrato do núcleo; um item sem `role:` aparece com seu `title`.
 
 !!! warning "Não edite os arquivos gerados"
     Arquivos `menu_state.*`, `menu_bindings.*`, `menu_ids.h` e outros são criados pelo gerador. Edite apenas `menu.yaml` e reconstrua — senão suas mudanças serão sobrescritas.
@@ -78,7 +78,7 @@ Temperatura-alvo de armazenamento:
 ```yaml
 - id: target_temp
   type: value
-  role: storage.target_temperature   # torna o parâmetro um widget no portal
+  role: storage.target_temperature   # rótulo do contrato do núcleo
   title: { ru: "ТЕМПЕРАТУРА", en: "TARGET TEMP" }
   unit:  { ru: "°C", en: "°C" }
   vtype: uint16
@@ -109,12 +109,12 @@ Histerese (quantos graus a temperatura pode cair abaixo da meta antes de o aquec
 ```
 
 !!! note "role: — é uma lista fechada"
-    O valor `role:` não pode ser inventado arbitrariamente — deve ser da lista `canonical_roles` do contrato do núcleo. Se nenhuma função apropriada existe, a construção para e mostra a lista de permitidas. Para um gabinete de armazenamento, funções da família `storage.*` se adequam: `storage.target_temperature`, `storage.target_humidity`, `storage.start`, `storage.stop`. Lista completa — no cabeçalho `menu.template.yaml`. Parâmetros sem `role:` (como histerese acima) funcionam como configurações internas: armazenadas em NVS, mas não exportadas para o portal.
+    O valor `role:` não pode ser inventado arbitrariamente — deve ser da lista `canonical_roles` do contrato do núcleo. Se nenhuma função apropriada existe, a construção para e mostra a lista de permitidas. Para um gabinete de armazenamento, funções da família `storage.*` se adequam: `storage.target_temperature`, `storage.target_humidity`, `storage.start`, `storage.stop`. Lista completa — no cabeçalho `menu.template.yaml`. `role:` é opcional: um parâmetro sem ela (como a histerese acima) é salvo e publicado do mesmo jeito, só o rótulo vem de `title`.
 
 Limitações que não podem ser violadas:
 
 - `bind` — não mais de 15 caracteres (limite de chave NVS);
-- não adicione campo `widget:` em `menu.yaml` — o tipo de widget é determinado pelo contrato em `role:`.
+- não adicione o campo `widget:` no `menu.yaml` — nem o portal nem o app o leem: um item do menu é desenhado pelo seu tipo.
 
 !!! warning "Verifique o item ignore_external_cmd do template"
     O template tem um item `ignore_external_cmd`, e seu `bind` — 19 caracteres, excedem o limite de 15. Se deixar como está, a geração cai: `bind 'ignore_external_cmd' ... tem 19 caracteres, limite 15`. Ou remova este item, ou encurte `bind` para `ign_ext_cmd` (como em produtos reais). Para um gabinete básico você pode simplesmente removê-lo.
@@ -140,33 +140,91 @@ src/menu/
 
 Se a construção caiu com mensagem sobre `role:` desconhecida — significa a função está escrita fora da lista `canonical_roles`. Corrija-a e reconstrua. Arquivos marcados autogen não edite manualmente.
 
-## Passo 5. Conecte o menu ao principal
+## Passo 5. Carregue o menu na inicialização
 
-Para usar o código do menu, conecte em `src/main.cpp` duas coisas:
+Conecte o menu gerado em `src/main.cpp` e carregue-o em `setup()` — **antes** de `s_link.begin()`:
 
-1. Cabeçalho do menu gerado:
+```cpp
+#include <menu_state.h>      // objeto menu com todos os parâmetros
+#include <menu_bindings.h>   // menu_sync_state_to_cache, menu_apply_by_bind
 
-    ```cpp
-    #include <menu_state.h>      // objeto menu com todos os parâmetros
-    ```
+menu.initDefaults();         // definir valores padrão de YAML
+menu.loadFromNVS();          // valores salvos; na primeira inicialização os valores padrão são salvos
+menu_sync_state_to_cache();  // valores para o cache de onde o menu publicado é montado
+```
 
-2. Carregamento de padrões em `setup()` — **antes** de `s_link.begin()`:
-
-    ```cpp
-    menu.initDefaults();         // definir valores padrão de YAML
-    ```
-
-Depois os parâmetros são acessíveis através do objeto global `menu`:
+Depois disso, os parâmetros ficam acessíveis pelo objeto global `menu`:
 
 ```cpp
 uint16_t target = menu.target_temp;   // acesso direto ao valor
 ```
 
-Esses valores você usa na lógica de aquecimento no próximo passo. Quando o usuário muda o parâmetro no portal, o núcleo aplica automaticamente o novo valor e o salva em NVS.
+## Passo 6. O menu no portal: publicar e aceitar mudanças
+
+O portal não lê o menu do dispositivo sozinho: o firmware o publica e aplica as mudanças que voltam. Três partes:
+
+- **publicar** — `menu_buildFullJson()` do core monta o JSON do menu a partir do `menu.yaml` e dos valores atuais; `devicePublisher()->publishConfigRaw()` envia para o portal (topic MQTT `config`) e para o app pela rede local;
+- **quando** — quando o dispositivo fica online e no comando `get_config`: o portal envia quando você abre o menu do dispositivo (a engrenagem no cartão);
+- **mudar** — o portal envia `set` com o `id` do item e o novo valor `val`. `menu_apply_by_bind()` grava o valor em `menu`, na NVS e no cache; depois o menu é publicado de novo e o portal mostra o valor confirmado.
+
+Adicione depois dos includes:
+
+```cpp
+#include <menu_commands.h>                   // menu_buildFullJson
+#include <local_access/device_publisher.h>   // publishConfigRaw
+
+static bool s_menuPending = false;   // publicar o menu a partir do loop()
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;              // limites do menu.yaml
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);     // menu + NVS + cache
+        s_menuPending = true;                          // mostrar o novo valor no portal
+        return;
+    }
+}
+```
+
+Em `setup()`, depois de `s_link.begin()`:
+
+```cpp
+s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
+```
+
+Em `loop()`, depois de `s_link.loop()`:
+
+```cpp
+static bool s_wasOnline = false;
+const bool online = s_link.isOnline();
+if (online && !s_wasOnline) s_menuPending = true;   // acabou de ficar online
+s_wasOnline = online;
+if (s_menuPending) {
+    s_menuPending = false;
+    publishMenu();
+}
+```
+
+!!! note "Por que o menu é publicado a partir do loop()"
+    Os callbacks de comando são chamados lá no fundo do handler de rede. Montar o JSON do menu ali gasta muita pilha, então o callback só levanta uma flag e o `loop()` publica.
+
+`applySet()` limita o valor ao `min`/`max` do item do `menu.yaml`: o dispositivo não confia cegamente em um número que chega.
 
 ## Completo `src/main.cpp` após este capítulo
 
-Comparado ao capítulo anterior, apenas duas linhas foram adicionadas (marcadas `// ← capítulo 6`): conexão do menu e `menu.initDefaults()`.
+Em relação ao capítulo anterior, foram adicionadas as linhas marcadas com `// ← capítulo 6`: carregar o menu, publicá-lo e aceitar mudanças.
 
 ??? note "O que foi — `src/main.cpp` após o capítulo 5"
 
@@ -214,6 +272,8 @@ Comparado ao capítulo anterior, apenas duas linhas foram adicionadas (marcadas 
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
         s_link.begin();
+        // Dispositivo desvinculado no portal: apagar o segredo e aguardar nova vinculação.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -236,7 +296,10 @@ Comparado ao capítulo anterior, apenas duas linhas foram adicionadas (marcadas 
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
-#include <menu_state.h>           // ← capítulo 6
+#include <menu_state.h>                      // ← capítulo 6: parâmetros (menu.target_temp …)
+#include <menu_bindings.h>                   // ← capítulo 6: menu_apply_by_bind
+#include <menu_commands.h>                   // ← capítulo 6: menu_buildFullJson
+#include <local_access/device_publisher.h>   // ← capítulo 6: publishConfigRaw
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -271,16 +334,56 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← capítulo 6: menu no portal
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
     s_climateOk = s_climate.begin();
-    menu.initDefaults();           // ← capítulo 6
+    menu.initDefaults();                     // ← capítulo 6
+    menu.loadFromNVS();                      // ← capítulo 6
+    menu_sync_state_to_cache();              // ← capítulo 6
     s_link.begin();
+    // Dispositivo desvinculado no portal: apagar o segredo e aguardar nova vinculação.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← capítulo 6
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← capítulo 6
 }
 
 void loop() {
     s_link.loop();
+
+    // ← capítulo 6: publicar o menu ao ficar online e sob pedido
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -298,9 +401,10 @@ void loop() {
 
 Após flashear:
 
-- na página do dispositivo do portal uma configuração de temperatura-alvo aparece;
-- a alteração do valor no portal é salva e sobrevive ao reinício;
-- parâmetros internos (histerese) são acessíveis no código via `menu`.
+- a engrenagem no cartão do dispositivo abre a página do dispositivo com o menu: a temperatura alvo (o portal a rotula pela role — “Storage temperature”) e **HYSTERESIS**;
+- mude um valor ali — o dispositivo aceita, salva na NVS e publica o menu de novo, e o portal mostra o valor confirmado;
+- depois de reiniciar, o dispositivo publica os valores salvos;
+- os parâmetros internos (histerese) ficam acessíveis no código pelo `menu`.
 
 ## O que vem a seguir
 

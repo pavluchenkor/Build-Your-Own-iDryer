@@ -33,9 +33,6 @@ Psát ovladač SHT31 od nuly není potřebné — gotová třída `Sht31ClimateS
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — vývody vaší desky
     s_climateOk = s_climate.begin();  // automaticky najde adresu 0x44 nebo 0x45
     s_link.begin();
+    // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ Níže je celý soubor dohromady. Nové řádky ve srovnání s předchozí kapi
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← kapitola 5  (SDA, SCL — vývody vaší desky)
     s_climateOk = s_climate.begin();  // ← kapitola 5
     s_link.begin();
+    // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

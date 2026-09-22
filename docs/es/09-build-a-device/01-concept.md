@@ -55,7 +55,7 @@ Cuando el dispositivo se construye en `idryer-core` y se vincula a la cuenta, ob
 - configuración de parámetros (temperatura objetivo, histéresis) a través del menú del dispositivo.
 
 !!! note "Sensores y controles propios en la tarjeta"
-    La tarjeta del dispositivo no está limitada a las capacidades del vocabulario (`has*`). A través de un card-manifest, el firmware puede declarar cualquier sensor y control personalizados: aparecerán automáticamente en el portal y en la aplicación. Cómo se hace esto se muestra en el ejemplo integral ["Filtro de aire inteligente"](../10-build-a-filter/01-concept.md), especialmente en [el capítulo sobre la tarjeta](../10-build-a-filter/06-card.md).
+    La tarjeta del dispositivo no está limitada a las capacidades del vocabulario (`has*`). A través de un card-manifest, el firmware puede declarar cualquier sensor y control personalizados: aparecerán automáticamente en el portal y en la aplicación. Cómo se hace esto se muestra en el ejemplo integral ["Filtro de aire inteligente"](../10-build-a-filter/01-concept.md), especialmente en [el capítulo sobre la tarjeta](../10-build-a-filter/06-card.md). El arranque y la parada del mantenimiento de calor se declaran como acciones de la tarjeta en el [capítulo 7](07-heating-control.md).
 
 ## De qué consta esta sección
 
@@ -66,7 +66,7 @@ A continuación va un camino paso a paso desde una placa vacía hasta un armario
 3. [Inicio del firmware en el núcleo](04-firmware-start.md) — proyecto PlatformIO, primer inicio, vinculación al portal.
 4. [Sensores](05-sensors.md) — conectamos SHT31 y termistor, obtenemos datos de ellos.
 5. [Menú de YAML](06-menu.md) — describimos la configuración del dispositivo, entra en NVS y al portal.
-6. [Control de calefacción](07-heating-control.md) — lógica de mantenimiento de temperatura, ventilador, comandos del portal.
+6. [Control de calefacción](07-heating-control.md) — lógica de mantenimiento de temperatura, ventilador, arranque y parada desde la tarjeta del dispositivo.
 7. [Ensamblaje y verificación](08-assembly-and-check.md) — ensamblaje final, primer calentamiento, lista de verificación de seguridad.
 
 !!! tip "Ejemplo completado"

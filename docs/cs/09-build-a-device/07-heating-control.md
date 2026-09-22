@@ -44,14 +44,20 @@ static GpioOutput myFan{5};      // GPIO5 — řízení ventilátoru
 
 Pro skříň na `40–45 °C` je dostačující jednoduchá hystereze: vytápění se zapíná a vypíná kolem cíle. To je jednodušší než plný PID a pro měkké udržování tepla funguje spolehlivě.
 
-Cílovou teplotu a hysterezí vezmeme z menu (`menu.target_temp`, `menu.hysteresis`) — je již připojeno v [kapitole 6](06-menu.md). Přidejte příznak stavu a funkci rozhodování:
+Hysterezi bereme z menu (`menu.hysteresis`) — to je už připojené v [kapitole 6](06-menu.md). Cílovou teplotu zadá uživatel při spuštění skříně z karty zařízení (`s_targetC`; kartu připojíme dále v této kapitole). Topí se jen v režimu Storage. Přidejte stav a rozhodovací funkci:
 
 ```cpp
-static bool s_heating = false;
+static bool  s_heating = false;
+static float s_targetC = 0.0f;   // cíl aktuálního spuštění, z karty
 
 static void controlLoop() {
+    // Topit jen v režimu Storage: po Stop skříň chladne.
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) {
+        s_heating = false;
+        return;
+    }
     float air    = s_link.telemetry.airTempC[0];     // SHT31
-    float target = (float)menu.target_temp;          // z menu
+    float target = s_targetC;                        // z karty
     float hyst   = (float)menu.hysteresis;           // z menu
 
     if (air < target - hyst) {
@@ -62,7 +68,7 @@ static void controlLoop() {
 }
 ```
 
-Cílová teplota a hystereze se berou z [menu](06-menu.md) — uživatel je mění z portálu.
+Cílová teplota přichází s příkazem ke spuštění z karty; její meze a výchozí hodnota jsou položka `target_temp` v [menu](06-menu.md).
 
 ## Ochrana ohřívače termistorem
 
@@ -128,36 +134,66 @@ void loop() {
 
 Pole telemetrie (`heaterPower01`, `fanOn`) fasáda publikuje sama — na portálu je vidět, zda zařízení právě topí a zda ventilátor funguje.
 
-## Příkazy z portálu
+## Karta: spuštění a zastavení
 
-Spuštění a zastavení údržby tepla portál posílá jako příkazy. Obslužná rutina se registruje metodou `s_link.onCommand(jméno, callback)` — **po** `s_link.begin()`. Příkazy akcí přicházejí s názvem `invoke` a polem `action` (role z menu, např. `storage.start` / `storage.stop`).
+Spuštění a zastavení přicházejí z karty zařízení na portálu a v aplikaci. Firmware je deklaruje jako **akce** karty: jádro je přidá do card manifestu a portál i aplikace samy nakreslí formulář a tlačítka. Příkazy v kódu nerozebíráte — jádro zavolá vaši funkci.
 
-Pro analýzu JSON jsou potřeba záhlaví `<ArduinoJson.h>` a `<string.h>` (pro `strcmp`) — přidejte je k ostatním `#include` na začátku souboru. Samotná obslužná rutina se umisťuje do `setup()`:
+Meze pole teploty a výchozí hodnota se berou z položky menu `target_temp` (30–50 °C, 45) přes most `card_menu_bridge.h`. Hodnota, kterou uživatel zadá, odchází s příkazem ke spuštění a do menu se nezapisuje. Přidejte hlavičku vedle hlaviček menu z kapitoly 6:
 
 ```cpp
-s_link.onCommand("invoke", [](JsonObjectConst data) {
-    const char* action = data["action"] | "";
-    if (strcmp(action, "storage.start") == 0) {
-        s_heating = true;
-        s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-        s_link.status.targetTempC[0] = (float)menu.target_temp;
-        s_link.publishStatusNow();
-    } else if (strcmp(action, "storage.stop") == 0) {
-        s_heating = false;
-        myHeater.off();
-        s_link.status.mode[0] = iDryer::UnitMode::Idle;
-        s_link.publishStatusNow();
-    }
-});
+#include <card/card_menu_bridge.h>
 ```
 
-- `storage.start` / `storage.stop` — stejné role, které jste nastavili v [menu](06-menu.md); portál podle nich kreslí tlačítka.
-- `iDryer::UnitMode::Storage` — režim měkkého udržování tepla. To je hlavní režim skříně.
-- `s_link.status.mode[0]` a `targetTempC[0]` zobrazují na portálu aktuální stav komory.
-- `publishStatusNow()` volejte po každé změně stavu, aby portál viděl změnu hned, bez čekání na časovač.
+Callbacky akcí — před `setup()`:
 
-!!! warning "Žádné delay() v obslužné rutině"
-    Obslužná rutina `onCommand` se volá z síťového callbacku. Jakékoli blokování v ní přeruší MQTT-relaci. Měňte příznaky a stav, práci samu dělej v `loop()`.
+```cpp
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();   // už v mezích 30..50
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+```
+
+V `setup()` za příkazy menu z kapitoly 6 deklarujte akce. Hodnoty menu už jsou v cache, ze které čte karta: `setup()` volá `menu_sync_state_to_cache()` od kapitoly 6.
+
+```cpp
+auto& card = s_link.card();
+idryer::card_menu::attach(card);
+card.action("storage", "STORAGE", onStorage)
+    .name("ru", "Хранение").name("en", "Storage")
+    .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+card.action("stop", "IDLE", onStop)
+    .name("ru", "Стоп").name("en", "Stop");
+```
+
+- `"STORAGE"` a `"IDLE"` — režim jednotky po akci. Dokud je skříň nečinná, karta ukazuje formulář spuštění; v režimu `STORAGE` blok relace a tlačítko Zastavit.
+- `MENU_TARGET_TEMP` — id položky `target_temp`; generátor ho uloží do `menu_ids.h`.
+- `s_link.status.mode[0]` a `targetTempC[0]` ukazují aktuální stav komory. Po každé změně volejte `publishStatusNow()`, aby se karta přepnula hned.
+- `iDryer::UnitMode::Storage` — režim jemného udržování tepla. Je to hlavní režim skříně.
+- Změňte teplotu uložení v menu zařízení na portálu — výchozí hodnota pole na kartě ji bude následovat: jádro samo zaznamená změnu menu a manifest publikuje znovu.
+
+Jádro přidá do card manifestu:
+
+```json
+"actions": [
+  {"id": "storage", "mode": "STORAGE", "name": {"ru": "Хранение", "en": "Storage"}, "action": "card.storage",
+   "params": [{"id": "temperature", "purpose": "target_temperature", "type": "number",
+               "limits": [30, 50], "step": 1, "default": 45, "unit": "°C"}]},
+  {"id": "stop", "mode": "IDLE", "name": {"ru": "Стоп", "en": "Stop"}, "action": "card.stop"}
+]
+```
+
+Na portálu dostane karta nečinné skříně pole `Tepl.` s 45 °C a tlačítko `Úložiště`; po spuštění blok relace s cílem a tlačítko `Zastavit`. V aplikaci hlavní obrazovka ukazuje hodnoty a běžící relaci, spuštění a zastavení jsou na stránce zařízení. Senzory, pole a rozvržení karty rozebírá kapitola [Karta zařízení](../10-build-a-filter/06-card.md) v části o vzduchovém filtru.
+
+!!! warning "Žádné delay() v callbackech"
+    Callbacky akcí se volají ze síťového handleru. Jakékoli blokování uvnitř přeruší relaci MQTT. Měňte cíl a stav, skutečnou práci dělejte v `loop()`.
 
 ## Úplný `src/main.cpp` po této kapitole
 
@@ -170,7 +206,10 @@ Toto je finální, hotový soubor zařízení. Nové řádky oproti předchozí 
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
-    #include <menu_state.h>
+    #include <menu_state.h>                      // ← kapitola 6: parametry (menu.target_temp …)
+    #include <menu_bindings.h>                   // ← kapitola 6: menu_apply_by_bind
+    #include <menu_commands.h>                   // ← kapitola 6: menu_buildFullJson
+    #include <local_access/device_publisher.h>   // ← kapitola 6: publishConfigRaw
 
     static const iDryer::Config CFG = {
         .deviceType        = iDryer::DeviceType::Dryer,
@@ -205,16 +244,56 @@ Toto je finální, hotový soubor zařízení. Nové řádky oproti předchozí 
         return tK - 273.15f;
     }
 
+    // ← kapitola 6: menu na portálu
+    static bool s_menuPending = false;
+
+    static void publishMenu() {
+        static char buf[MENU_FULL_JSON_BUF_SIZE];
+        const size_t len = menu_buildFullJson(buf, sizeof(buf));
+        if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+    }
+
+    static void applySet(JsonObjectConst data) {
+        const int id = data["id"] | -1;
+        float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                         : data["val"].as<float>();
+        for (uint16_t i = 0; i < g_bindings_count; i++) {
+            if ((int)g_bindings[i].id != id) continue;
+            const MenuMeta& m = g_menu_meta[id];
+            if (v < m.min_val) v = m.min_val;
+            if (v > m.max_val) v = m.max_val;
+            menu_apply_by_bind(g_bindings[i].bind, v);
+            s_menuPending = true;
+            return;
+        }
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
-        menu.initDefaults();
+        menu.initDefaults();                     // ← kapitola 6
+        menu.loadFromNVS();                      // ← kapitola 6
+        menu_sync_state_to_cache();              // ← kapitola 6
         s_link.begin();
+        // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+        s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← kapitola 6
+        s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← kapitola 6
     }
 
     void loop() {
         s_link.loop();
+
+        // ← kapitola 6: publikujeme menu po přechodu online a na žádost
+        static bool s_wasOnline = false;
+        const bool online = s_link.isOnline();
+        if (online && !s_wasOnline) s_menuPending = true;
+        s_wasOnline = online;
+        if (s_menuPending) {
+            s_menuPending = false;
+            publishMenu();
+        }
 
         if (s_climateOk) {
             s_climate.tick(millis());
@@ -229,13 +308,15 @@ Toto je finální, hotový soubor zařízení. Nové řádky oproti předchozí 
     ```
 
 ```cpp
-#include <Wire.h>
-#include <ArduinoJson.h>          // ← kapitola 7 (onCommand: JsonObjectConst)
-#include <string.h>              // ← kapitola 7 (strcmp)
-#include <math.h>
 #include <iDryer.h>
+#include <Wire.h>
+#include <math.h>
 #include "Sht31ClimateSensor.h"
 #include <menu_state.h>
+#include <menu_bindings.h>
+#include <menu_commands.h>
+#include <local_access/device_publisher.h>
+#include <card/card_menu_bridge.h>        // ← kapitola 7
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -270,6 +351,29 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 // ← kapitola 7: klíče ohřívače a ventilátoru
 struct GpioOutput {
     int pin;
@@ -282,11 +386,13 @@ static GpioOutput myFan{5};
 
 // ← kapitola 7: logika údržby teploty
 static bool        s_heating    = false;
+static float       s_targetC    = 0.0f;
 static const float HEATER_MAX_C = 80.0f;
 
 static void controlLoop() {
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) { s_heating = false; return; }
     float air    = s_link.telemetry.airTempC[0];
-    float target = (float)menu.target_temp;
+    float target = s_targetC;
     float hyst   = (float)menu.hysteresis;
     if (air < target - hyst)  s_heating = true;
     else if (air >= target)   s_heating = false;
@@ -304,6 +410,20 @@ static void applyFan() {
     s_link.telemetry.fanOn[0] = s_heating;
 }
 
+// ← kapitola 7: akce karty
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
@@ -311,26 +431,34 @@ void setup() {
     myHeater.begin();              // ← kapitola 7
     myFan.begin();                 // ← kapitola 7
     menu.initDefaults();
+    menu.loadFromNVS();
+    menu_sync_state_to_cache();
     s_link.begin();
+    // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
 
-    s_link.onCommand("invoke", [](JsonObjectConst data) {   // ← kapitola 7
-        const char* action = data["action"] | "";
-        if (strcmp(action, "storage.start") == 0) {
-            s_heating = true;
-            s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-            s_link.status.targetTempC[0] = (float)menu.target_temp;
-            s_link.publishStatusNow();
-        } else if (strcmp(action, "storage.stop") == 0) {
-            s_heating = false;
-            myHeater.off();
-            s_link.status.mode[0] = iDryer::UnitMode::Idle;
-            s_link.publishStatusNow();
-        }
-    });
+    auto& card = s_link.card();                          // ← kapitola 7
+    idryer::card_menu::attach(card);
+    card.action("storage", "STORAGE", onStorage)
+        .name("ru", "Хранение").name("en", "Storage")
+        .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+    card.action("stop", "IDLE", onStop)
+        .name("ru", "Стоп").name("en", "Stop");
 }
 
 void loop() {
     s_link.loop();
+
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -352,11 +480,11 @@ void loop() {
 
 Po tomto kroku:
 
-- spuštění z portálu převede skříň do režimu Storage, zařízení začne topit;
+- tlačítko `Úložiště` na kartě zařízení převede skříň do režimu Storage se zadanou teplotou, zařízení začne topit;
 - teplota vzduchu se přiblíží k cíli a zůstane v mezích histereze;
 - ohřívač nepřekročí `HEATER_MAX_C`;
 - ventilátor a výkon topení jsou vidět v telemetrii;
-- zastavení z portálu vypne vytápění a převede do režimu Idle.
+- tlačítko `Zastavit` vypne topení a převede do Idle; do dalšího spuštění skříň netopí.
 
 ## Co dál
 

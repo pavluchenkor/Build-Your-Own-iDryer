@@ -33,9 +33,6 @@ description: "在 ESP32 上读取 SHT31 气候传感器和加热器温度计：�
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — 你的板的引脚
     s_climateOk = s_climate.begin();  // 自己找到地址 0x44 或 0x45
     s_link.begin();
+    // 设备在门户上被解绑：清除密钥，等待重新绑定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // 设备在门户上被解绑：清除密钥，等待重新绑定。
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← 第 5 章（SDA、SCL — 你的板的引脚）
     s_climateOk = s_climate.begin();  // ← 第 5 章
     s_link.begin();
+    // 设备在门户上被解绑：清除密钥，等待重新绑定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

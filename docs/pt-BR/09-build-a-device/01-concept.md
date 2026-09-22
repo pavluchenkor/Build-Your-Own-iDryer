@@ -55,7 +55,7 @@ Quando o dispositivo é montado em `idryer-core` e vinculado à conta, você obt
 - configurar parâmetros (temperatura-alvo, histerese) por meio do menu do dispositivo.
 
 !!! note "Os seus próprios sensores e botões no cartão"
-    O cartão do dispositivo não se limita às capacidades declaradas em `has*`. Através do card-manifest, o firmware pode declarar qualquer sensor ou controle próprio — eles aparecem automaticamente no portal e no aplicativo. Como fazer isso — exemplo completo [«Filtro de ar inteligente»](../10-build-a-filter/01-concept.md), em especial [o capítulo sobre o cartão](../10-build-a-filter/06-card.md).
+    O cartão do dispositivo não se limita às capacidades declaradas em `has*`. Através do card-manifest, o firmware pode declarar qualquer sensor ou controle próprio — eles aparecem automaticamente no portal e no aplicativo. Como fazer isso — exemplo completo [«Filtro de ar inteligente»](../10-build-a-filter/01-concept.md), em especial [o capítulo sobre o cartão](../10-build-a-filter/06-card.md). A partida e a parada da manutenção de calor são declaradas como ações do cartão no [capítulo 7](07-heating-control.md).
 
 ## Do que consiste esta seção
 
@@ -66,7 +66,7 @@ A seguir está o caminho passo a passo de uma placa vazia para um gabinete funci
 3. [Início da firmware no núcleo](04-firmware-start.md) — projeto PlatformIO, primeiro lançamento, vinculação ao portal.
 4. [Sensores](05-sensors.md) — conectamos SHT31 e termistor, obtemos dados deles.
 5. [Menu em YAML](06-menu.md) — descrevemos configurações do dispositivo, elas vão para NVS e portal.
-6. [Controle de aquecimento](07-heating-control.md) — lógica de manutenção de temperatura, ventilador, comandos do portal.
+6. [Controle de aquecimento](07-heating-control.md) — lógica de manutenção de temperatura, ventilador, partida e parada pelo cartão do dispositivo.
 7. [Montagem e verificação](08-assembly-and-check.md) — montagem final, primeiro aquecimento, lista de verificação de segurança.
 
 !!! tip "Exemplo pronto"

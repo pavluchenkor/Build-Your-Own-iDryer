@@ -44,14 +44,20 @@ static GpioOutput myFan{5};      // GPIO5 — 風扇控制
 
 對於`40-45 °C`的櫃子，簡單的滯後就足夠了：加熱在目標周圍開啟和關閉。這比完整的PID更簡單，對於溫和的保溫效果可靠。
 
-目標溫度和滯後來自菜單（`menu.target_temp`、`menu.hysteresis`）——它已在[第6章](06-menu.md)中連接。新增狀態旗標和決策函式：
+磁滯取自選單（`menu.hysteresis`）——它已在[第 6 章](06-menu.md)中接入。目標溫度由使用者在裝置卡片上啟動儲料櫃時設定（`s_targetC`；卡片在本章後面接入）。只在 Storage 模式下加熱。新增狀態和判斷函式：
 
 ```cpp
-static bool s_heating = false;
+static bool  s_heating = false;
+static float s_targetC = 0.0f;   // 本次執行的目標，來自卡片
 
 static void controlLoop() {
+    // 只在 Storage 模式下加熱：停止後櫃子自然冷卻。
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) {
+        s_heating = false;
+        return;
+    }
     float air    = s_link.telemetry.airTempC[0];     // SHT31
-    float target = (float)menu.target_temp;          // 來自菜單
+    float target = s_targetC;                        // 來自卡片
     float hyst   = (float)menu.hysteresis;           // 來自菜單
 
     if (air < target - hyst) {
@@ -62,7 +68,7 @@ static void controlLoop() {
 }
 ```
 
-目標溫度和滯後來自[菜單](06-menu.md)——使用者從門戶更改它們。
+目標溫度隨卡片的啟動指令一起送達；它的範圍和預設值是[選單](06-menu.md)中的 `target_temp` 項目。
 
 ## 根據溫敏電阻保護加熱器
 
@@ -128,36 +134,66 @@ void loop() {
 
 遙測欄位（`heaterPower01`、`fanOn`）由外觀自動發佈——在門戶中看到設備現在是否加熱和風扇是否工作。
 
-## 來自門戶的命令
+## 卡片：啟動和停止
 
-門戶作為命令傳送保溫的啟動和停止。處理器透過方法`s_link.onCommand(name, callback)`註冊——**在`s_link.begin()`之後**。操作命令帶有名稱`invoke`和`action`欄位（菜單中的角色，例如`storage.start` / `storage.stop`）。
+啟動和停止來自門戶和應用程式中的裝置卡片。韌體把它們宣告為卡片 **動作**：核心庫把它們加入 card 清單，門戶和應用程式自行繪製表單和按鈕。程式碼中無需解析指令——核心庫會呼叫你的函式。
 
-要解析JSON，需要標題`<ArduinoJson.h>`和`<string.h>`（用於`strcmp`）——將它們新增到檔案開始的其他`#include`。處理器本身在`setup()`中設定：
+溫度欄位的範圍和預設值透過橋接 `card_menu_bridge.h` 取自選單項目 `target_temp`（30–50 °C，45）。使用者輸入的值隨啟動指令送出，不會寫入選單。在第 6 章的選單標頭檔旁邊加入標頭檔：
 
 ```cpp
-s_link.onCommand("invoke", [](JsonObjectConst data) {
-    const char* action = data["action"] | "";
-    if (strcmp(action, "storage.start") == 0) {
-        s_heating = true;
-        s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-        s_link.status.targetTempC[0] = (float)menu.target_temp;
-        s_link.publishStatusNow();
-    } else if (strcmp(action, "storage.stop") == 0) {
-        s_heating = false;
-        myHeater.off();
-        s_link.status.mode[0] = iDryer::UnitMode::Idle;
-        s_link.publishStatusNow();
-    }
-});
+#include <card/card_menu_bridge.h>
 ```
 
-- `storage.start` / `storage.stop` — 與你在[菜單](06-menu.md)中設定的相同角色；門戶根據它們繪製按鈕。
-- `iDryer::UnitMode::Storage` — 溫和保溫模式。這是櫃的主要模式。
-- `s_link.status.mode[0]`和`targetTempC[0]`在門戶上顯示腔室的當前狀態。
-- `publishStatusNow()`在每次狀態改變後呼叫，以便門戶立即看到它，不用等待計時器。
+動作回呼——放在 `setup()` 之前：
 
-!!! warning "處理器中無delay()"
-    `onCommand`處理器從網路回調呼叫。其中的任何阻塞都會中斷MQTT會話。改變旗標和狀態，而在`loop()`中做實際工作。
+```cpp
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();   // 已在 30..50 範圍內
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+```
+
+在 `setup()` 中，在第 6 章的選單指令之後宣告動作。選單值已經在卡片讀取的快取中：從第 6 章起 `setup()` 就呼叫了 `menu_sync_state_to_cache()`。
+
+```cpp
+auto& card = s_link.card();
+idryer::card_menu::attach(card);
+card.action("storage", "STORAGE", onStorage)
+    .name("ru", "Хранение").name("en", "Storage")
+    .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+card.action("stop", "IDLE", onStop)
+    .name("ru", "Стоп").name("en", "Stop");
+```
+
+- `"STORAGE"` 和 `"IDLE"` —— 動作之後單元的模式。櫃子閒置時，卡片顯示啟動表單；模式為 `STORAGE` 時，顯示工作階段區塊和停止按鈕。
+- `MENU_TARGET_TEMP` —— `target_temp` 項目的 id；產生器把它寫入 `menu_ids.h`。
+- `s_link.status.mode[0]` 和 `targetTempC[0]` 顯示腔體目前狀態。每次改變後呼叫 `publishStatusNow()`，卡片會立即切換。
+- `iDryer::UnitMode::Storage` —— 溫和保溫模式。這是儲料櫃的主要模式。
+- 在門戶的裝置選單中修改儲存溫度——卡片欄位的預設值會隨之改變：核心庫會自己發現選單變化並重新發布清單。
+
+核心庫在 card 清單中加入：
+
+```json
+"actions": [
+  {"id": "storage", "mode": "STORAGE", "name": {"ru": "Хранение", "en": "Storage"}, "action": "card.storage",
+   "params": [{"id": "temperature", "purpose": "target_temperature", "type": "number",
+               "limits": [30, 50], "step": 1, "default": 45, "unit": "°C"}]},
+  {"id": "stop", "mode": "IDLE", "name": {"ru": "Стоп", "en": "Stop"}, "action": "card.stop"}
+]
+```
+
+在門戶上，閒置儲料櫃的卡片出現 `Temp.` 欄位（45 °C）和 `Storage` 按鈕；啟動後顯示帶目標值的工作階段區塊和 `Stop` 按鈕。在應用程式中，首頁顯示讀數和進行中的工作階段，啟動和停止在裝置頁面。卡片的感測器、欄位和版面在空氣過濾器部分的 [裝置卡片](../10-build-a-filter/06-card.md) 一章中介紹。
+
+!!! warning "回呼中不要使用 delay()"
+    動作回呼由網路處理程式呼叫。回呼中的任何阻塞都會中斷 MQTT 工作階段。只修改目標值和狀態，實際工作放在 `loop()` 中。
 
 ## 本章後的完整`src/main.cpp`
 
@@ -170,7 +206,10 @@ s_link.onCommand("invoke", [](JsonObjectConst data) {
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
-    #include <menu_state.h>
+    #include <menu_state.h>                      // ← 第6章：參數（menu.target_temp …）
+    #include <menu_bindings.h>                   // ← 第6章：menu_apply_by_bind
+    #include <menu_commands.h>                   // ← 第6章：menu_buildFullJson
+    #include <local_access/device_publisher.h>   // ← 第6章：publishConfigRaw
 
     static const iDryer::Config CFG = {
         .deviceType        = iDryer::DeviceType::Dryer,
@@ -205,16 +244,56 @@ s_link.onCommand("invoke", [](JsonObjectConst data) {
         return tK - 273.15f;
     }
 
+    // ← 第6章：門戶上的選單
+    static bool s_menuPending = false;
+
+    static void publishMenu() {
+        static char buf[MENU_FULL_JSON_BUF_SIZE];
+        const size_t len = menu_buildFullJson(buf, sizeof(buf));
+        if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+    }
+
+    static void applySet(JsonObjectConst data) {
+        const int id = data["id"] | -1;
+        float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                         : data["val"].as<float>();
+        for (uint16_t i = 0; i < g_bindings_count; i++) {
+            if ((int)g_bindings[i].id != id) continue;
+            const MenuMeta& m = g_menu_meta[id];
+            if (v < m.min_val) v = m.min_val;
+            if (v > m.max_val) v = m.max_val;
+            menu_apply_by_bind(g_bindings[i].bind, v);
+            s_menuPending = true;
+            return;
+        }
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
-        menu.initDefaults();
+        menu.initDefaults();                     // ← 第6章
+        menu.loadFromNVS();                      // ← 第6章
+        menu_sync_state_to_cache();              // ← 第6章
         s_link.begin();
+        // 裝置在門戶上被解除綁定：清除金鑰，等待重新綁定。
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+        s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← 第6章
+        s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← 第6章
     }
 
     void loop() {
         s_link.loop();
+
+        // ← 第6章：上線時和收到請求時發布選單
+        static bool s_wasOnline = false;
+        const bool online = s_link.isOnline();
+        if (online && !s_wasOnline) s_menuPending = true;
+        s_wasOnline = online;
+        if (s_menuPending) {
+            s_menuPending = false;
+            publishMenu();
+        }
 
         if (s_climateOk) {
             s_climate.tick(millis());
@@ -229,13 +308,15 @@ s_link.onCommand("invoke", [](JsonObjectConst data) {
     ```
 
 ```cpp
-#include <Wire.h>
-#include <ArduinoJson.h>          // ← 第7章（onCommand：JsonObjectConst）
-#include <string.h>              // ← 第7章（strcmp）
-#include <math.h>
 #include <iDryer.h>
+#include <Wire.h>
+#include <math.h>
 #include "Sht31ClimateSensor.h"
 #include <menu_state.h>
+#include <menu_bindings.h>
+#include <menu_commands.h>
+#include <local_access/device_publisher.h>
+#include <card/card_menu_bridge.h>        // ← 第7章
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -270,6 +351,29 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 // ← 第7章：加熱器和風扇開關
 struct GpioOutput {
     int pin;
@@ -282,11 +386,13 @@ static GpioOutput myFan{5};
 
 // ← 第7章：溫度維持邏輯
 static bool        s_heating    = false;
+static float       s_targetC    = 0.0f;
 static const float HEATER_MAX_C = 80.0f;
 
 static void controlLoop() {
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) { s_heating = false; return; }
     float air    = s_link.telemetry.airTempC[0];
-    float target = (float)menu.target_temp;
+    float target = s_targetC;
     float hyst   = (float)menu.hysteresis;
     if (air < target - hyst)  s_heating = true;
     else if (air >= target)   s_heating = false;
@@ -304,6 +410,20 @@ static void applyFan() {
     s_link.telemetry.fanOn[0] = s_heating;
 }
 
+// ← 第7章：卡片動作
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
@@ -311,26 +431,34 @@ void setup() {
     myHeater.begin();              // ← 第7章
     myFan.begin();                 // ← 第7章
     menu.initDefaults();
+    menu.loadFromNVS();
+    menu_sync_state_to_cache();
     s_link.begin();
+    // 裝置在門戶上被解除綁定：清除金鑰，等待重新綁定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
 
-    s_link.onCommand("invoke", [](JsonObjectConst data) {   // ← 第7章
-        const char* action = data["action"] | "";
-        if (strcmp(action, "storage.start") == 0) {
-            s_heating = true;
-            s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-            s_link.status.targetTempC[0] = (float)menu.target_temp;
-            s_link.publishStatusNow();
-        } else if (strcmp(action, "storage.stop") == 0) {
-            s_heating = false;
-            myHeater.off();
-            s_link.status.mode[0] = iDryer::UnitMode::Idle;
-            s_link.publishStatusNow();
-        }
-    });
+    auto& card = s_link.card();                          // ← 第7章
+    idryer::card_menu::attach(card);
+    card.action("storage", "STORAGE", onStorage)
+        .name("ru", "Хранение").name("en", "Storage")
+        .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+    card.action("stop", "IDLE", onStop)
+        .name("ru", "Стоп").name("en", "Stop");
 }
 
 void loop() {
     s_link.loop();
+
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -352,11 +480,11 @@ void loop() {
 
 此步驟後：
 
-- 門戶啟動將櫃轉為儲存模式，設備開始加熱；
+- 裝置卡片上的 `Storage` 按鈕以輸入的溫度讓儲料櫃進入 Storage 模式，裝置開始加熱；
 - 空氣溫度逼近目標，保持在滯後範圍內；
 - 加熱器不會超過`HEATER_MAX_C`；
 - 風扇和加熱功率在遙測中可見；
-- 門戶停止關閉加熱並轉為閒置。
+- `Stop` 按鈕關閉加熱並轉為 Idle；在下次啟動前櫃子不再加熱。
 
 ## 下一步
 

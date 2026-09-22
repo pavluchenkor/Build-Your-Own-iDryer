@@ -1,6 +1,6 @@
 ---
 title: "Démarrage du firmware sur idryer-core : premier lancement et connexion au portail"
-description: "Création d'un projet PlatformIO basé sur idryer-core : platformio.ini, secrets.h, Config de l'appareil, premier flashage d'ESP32 et connexion au portail iDryer."
+description: "Créer un projet PlatformIO avec la bibliothèque idryer-core : platformio.ini, Config de l'appareil, premier flash de l'ESP32, réglage du Wi-Fi et association de l'appareil au portail iDryer dans l'application."
 ---
 
 # Démarrage du firmware sur le cœur
@@ -16,6 +16,7 @@ Vous aurez besoin de :
 - VS Code avec l'extension PlatformIO ;
 - Un câble USB ;
 - Un réseau Wi-Fi `2.4 GHz` (ESP32 ne fonctionne pas avec les réseaux uniquement `5 GHz`).
+- un smartphone avec l'application iDryer connectée à votre compte du portail iDryer : c'est par elle que l'appareil reçoit le réseau Wi-Fi et est associé au compte.
 
 Ce qu'est le firmware du contrôleur et comment il arrive sur la carte — [Flashage du contrôleur](../02-controllers/11-flashing-controller.md).
 
@@ -26,8 +27,6 @@ Dans PlatformIO, un projet est un dossier avec une structure fixe. Créez un dos
 ```text
 my-cabinet/
 ├── platformio.ini        # paramètres de compilation (remplis à l'étape 4)
-├── include/
-│   └── secrets.h         # login et mot de passe Wi-Fi (étape 3)
 ├── lib/
 │   └── idryer-core/      # bibliothèque du cœur (lien symbolique ou copie)
 └── src/
@@ -44,16 +43,9 @@ ln -s /chemin/vers/idryer-core lib/idryer-core
 
 Ceci est également requis pour la génération du menu (chapitre 6) — le hook cherche le générateur à l'intérieur de `lib/idryer-core/`.
 
-## 3. Créez secrets.h
+## 3. Le Wi-Fi et l'association ne sont pas dans le code
 
-Copiez l'exemple `secrets.h.example` de la bibliothèque dans `include/secrets.h` de votre projet et entrez les données de votre réseau :
-
-```cpp
-#define WIFI_SSID      "your-ssid"
-#define WIFI_PASSWORD  "your-password"
-```
-
-Ajoutez `include/secrets.h` à `.gitignore` pour que le mot de passe ne se retrouve pas dans le dépôt.
+Le firmware ne contient ni le mot de passe du réseau ni les données du compte. Au premier démarrage, l'appareil n'a pas de Wi-Fi et attend des réglages : l'application iDryer les envoie par les ondes (ESPTouch), puis associe l'appareil à votre compte avec un jeton d'association à usage unique. Le core fait tout cela dans `s_link.begin()` et `s_link.loop()` ; il vous reste à suivre les étapes de l'application — section 9.
 
 ## 4. Configurez platformio.ini
 
@@ -65,12 +57,11 @@ platform    = espressif32
 framework   = arduino
 board       = esp32-c3-devkitm-1
 
-lib_deps =
-    bblanchon/ArduinoJson @ ^6.21.0
-    knolleary/PubSubClient
-    densaugeo/base64 @ ^1.4.0
-    links2004/WebSockets @ ^2.4.0
-    https://github.com/jnthas/Improv-WiFi-Library.git
+; Les bibliothèques du core (MQTT, ArduinoJson, WebSockets, Improv) arrivent
+; d'elles-mêmes depuis lib/idryer-core/library.json.
+; ESPAsyncTCP est le transport ESP8266 venant des dépendances d'espMqttClient :
+; il ne compile pas sur ESP32 et doit être exclu.
+lib_ignore = ESPAsyncTCP
 
 build_flags =
     -DIDRYER_API_BASE='"https://portal.idryer.org/api"'
@@ -81,8 +72,8 @@ build_flags =
 
 Remplacez `board` par votre carte (par exemple, `esp32-s3-devkitc-1`). Pas besoin de spécifier `idryer-core` dans `lib_deps` — elle se trouve dans `lib/` (étape 2).
 
-!!! note "Pourquoi toutes ces dépendances"
-    `ArduinoJson`, `PubSubClient`, `base64`, `WebSockets` et `Improv-WiFi-Library` sont nécessaires pour la bibliothèque `idryer-core` elle-même (MQTT, accès WebSocket par LAN, provisionnement Wi-Fi). Sans aucune d'elles, la compilation échouera avec une erreur du type `... .h: No such file`. Les drapeaux `MQTT_BROKER` et `MQTT_PORT` sont également obligatoires — sans eux, le cœur ne se compilera pas (`'MQTT_BROKER' was not declared`).
+!!! note "Ce que font ces lignes"
+    Inutile de lister les dépendances du core : PlatformIO les prend dans `lib/idryer-core/library.json`. `lib_ignore = ESPAsyncTCP` est obligatoire — sans lui, la compilation échoue dans `ESPAsyncTCP.cpp`. Les flags `MQTT_BROKER` et `MQTT_PORT` sont aussi obligatoires — sans eux le core ne compile pas (`'MQTT_BROKER' was not declared`).
 
 ## 5. Décrivez l'appareil dans Config
 
@@ -129,6 +120,8 @@ Dans le même fichier, après le bloc `Config`, ajoutez les fonctions `setup()` 
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -136,7 +129,7 @@ void loop() {
 }
 ```
 
-Cela suffit pour que l'appareil se connecte à Wi-Fi et se présente au portail. Les capteurs seront ajoutés à l'étape [Capteurs](05-sensors.md).
+`s_link.begin()` démarre le Wi-Fi, l'association et la connexion au portail. La commande `revoke` vient du portail quand l'appareil est dissocié du compte : `handleRevoke()` efface le secret de l'appareil, qui attend alors une nouvelle association. Les capteurs arrivent à l'étape [Capteurs](05-sensors.md).
 
 ### `src/main.cpp` complet après ce chapitre
 
@@ -164,6 +157,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -179,43 +174,51 @@ Le chapitre précédent montre **ce qu'il faut ajouter** et le **`src/main.cpp` 
 pio run -e cabinet -t upload
 ```
 
-## 8. Ouvrez Serial Monitor
+## 8. Ouvrez le Serial Monitor
 
 ```bash
 pio device monitor -b 115200
 ```
 
-Séquence attendue dans le journal :
+Tant que l'appareil n'a pas de Wi-Fi, le journal reste muet : le core réserve le port série à l'installateur web (Improv). Les journaux s'activent dès que le Wi-Fi est en place. Sur un appareil pas encore associé, le journal se termine ainsi :
 
 ```text
-[CLOUD] Connecting to WiFi...
-[CLOUD] WiFi connected, IP: 192.168.1.42
-[CLOUD] Provisioning device...
-[CLOUD] PIN: 1234567 (expires in 600s)
+[BOOT] WiFi ok, logs enabled
+[INFO ] CLOUD: WiFi connected, IP: 192.168.1.42, RSSI: -55 dBm, …
+…
+[INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-Si l'appareil s'est arrêté à la ligne `PIN: ...` — c'est normal. Procédez à la connexion.
+Laissez le moniteur ouvert et passez à l'application.
 
-## 9. Connectez l'appareil au portail
+## 9. Connectez le Wi-Fi et associez l'appareil dans l'application
 
-1. Ouvrez [portal.idryer.org](https://portal.idryer.org/).
-2. Allez à la section **Add device**.
-3. Entrez le PIN du Serial Monitor.
+1. Connectez le téléphone au réseau Wi-Fi où fonctionnera l'appareil (`2.4 GHz`) et connectez-vous à l'application iDryer avec votre compte du portail.
+2. Sur l'écran d'accueil, touchez **Connecter un nouvel appareil** — l'étape **Wi-Fi** s'ouvre.
+3. Vérifiez le nom du réseau (l'application le remplit elle-même si la localisation est activée), saisissez le mot de passe et touchez **Connecter l’appareil**. L'application envoie les réglages pendant 90 secondes au maximum ; quand l'appareil rejoint le réseau, **Appareil connecté** s'affiche. Touchez **Suivant**.
+4. À l'étape **Association**, touchez **Associer**. L'application trouve l'appareil sur le réseau, obtient du portail un jeton d'association à usage unique, le remet à l'appareil et attend que le portail confirme que l'appareil est en ligne.
+5. Après **Appareil associé**, l'appareil apparaît dans la liste des appareils du portail et de l'application.
 
-Après la connexion, l'appareil passera au statut `Online`. Le journal affichera :
+Si l'appareil est déjà sur le réseau, ouvrez directement l'étape **Association** — touchez sa puce en haut de la fenêtre.
+
+Le journal montre l'association :
 
 ```text
-[CLOUD] Device claimed!
-[CLOUD] MQTT connected!
+[INFO ] CLOUD: binding-v3: pairing token received (… chars)
+[INFO ] CLOUD: binding-v3: activating with pairing token (serial=DEVICE_… mcu=-)
+[INFO ] CLOUD: binding-v3: activated, deviceId=… -> Ready
+…
+[INFO ] MQTT: Connected! …
 ```
 
 ## Vérification du résultat
 
-À cette étape, l'appareil doit être Online sur le portail. Aucune donnée de capteur pour l'instant — c'est normal. Si l'appareil ne se connecte pas :
+À ce stade, l'appareil doit être Online sur le portail. Il n'y a pas encore de données de capteurs — c'est normal. Si quelque chose s'est mal passé :
 
-- vérifiez que le réseau `2.4 GHz` et le mot de passe dans `secrets.h` sont corrects ;
-- vérifiez l'alimentation de l'ESP32 (les baisses de tension au démarrage du Wi-Fi sont une cause fréquente de redémarrages) ;
-- consultez [Erreurs d'alimentation](../08-common-mistakes/02-power-mistakes.md) et [Erreurs de contrôleur](../08-common-mistakes/04-controller-mistakes.md).
+- l'application n'a pas vu l'appareil rejoindre le réseau — vérifiez le mot de passe et que le réseau est en `2.4 GHz` ; avec un mauvais mot de passe, l'appareil attend de nouveau les réglages, refaites l'étape Wi-Fi ;
+- à l'étape **Association**, l'application n'a pas trouvé l'appareil — le téléphone et l'appareil doivent être sur le même réseau, et le réseau ne doit pas bloquer la découverte d'appareils (les réseaux invités le font souvent) ;
+- l'appareil redémarre — vérifiez l'alimentation de l'ESP32 (les chutes de tension au démarrage sont une cause fréquente de redémarrages) ;
+- voir [Erreurs d'alimentation](../08-common-mistakes/02-power-mistakes.md) et [Erreurs de contrôleur](../08-common-mistakes/04-controller-mistakes.md).
 
 ## Prochaines étapes
 

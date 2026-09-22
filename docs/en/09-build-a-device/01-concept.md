@@ -55,7 +55,7 @@ When a device is built on `idryer-core` and bound to an account, you get without
 - parameter configuration (target temperature, hysteresis) via device menu.
 
 !!! note "Custom sensors and controls on the card"
-    The device card is not limited to vocabulary capabilities (`has*`). Through a card manifest, the firmware can declare any custom sensors and controls — they will automatically appear on the portal and in the app. How to do this is shown in the end-to-end example ["Smart Air Filter"](../10-build-a-filter/01-concept.md), especially in [the card chapter](../10-build-a-filter/06-card.md).
+    The device card is not limited to vocabulary capabilities (`has*`). Through a card manifest, the firmware can declare any custom sensors and controls — they will automatically appear on the portal and in the app. How to do this is shown in the end-to-end example ["Smart Air Filter"](../10-build-a-filter/01-concept.md), especially in [the card chapter](../10-build-a-filter/06-card.md). Start and stop of heat maintenance are declared as card actions in [chapter 7](07-heating-control.md).
 
 ## What This Section Includes
 
@@ -66,7 +66,7 @@ Below is a step-by-step path from an empty board to a working cabinet:
 3. [Firmware Start on Core](04-firmware-start.md) — PlatformIO project, first run, binding to portal.
 4. [Sensors](05-sensors.md) — connect SHT31 and thermistor, read data from them.
 5. [Menu from YAML](06-menu.md) — describe device settings, they go into NVS and to the portal.
-6. [Heating Control](07-heating-control.md) — temperature maintenance logic, fan, portal commands.
+6. [Heating Control](07-heating-control.md) — temperature maintenance logic, fan, start and stop from the device card.
 7. [Assembly and Check](08-assembly-and-check.md) — final assembly, first heat run, safety checklist.
 
 !!! tip "Ready-made example"

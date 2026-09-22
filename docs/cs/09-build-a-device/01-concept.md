@@ -55,7 +55,7 @@ Když je zařízení postaveno na `idryer-core` a vázáno na účet, získáte 
 - konfiguraci parametrů (cílová teplota, hystereze) přes menu zařízení.
 
 !!! note "Vlastní senzory a tlačítka na kartě zařízení"
-    Karta zařízení není omezena na slovníkové schopnosti (`has*`). Prostřednictvím card-manifestu může firmware deklarovat libovolné vlastní senzory a ovládací prvky — automaticky se zobrazí na portálu i v aplikaci. Jak to udělat ukazuje průřezový příklad [„Chytrý vzduchový filtr"](../10-build-a-filter/01-concept.md), zejména [kapitola o kartě](../10-build-a-filter/06-card.md).
+    Karta zařízení není omezena na slovníkové schopnosti (`has*`). Prostřednictvím card-manifestu může firmware deklarovat libovolné vlastní senzory a ovládací prvky — automaticky se zobrazí na portálu i v aplikaci. Jak to udělat ukazuje průřezový příklad [„Chytrý vzduchový filtr"](../10-build-a-filter/01-concept.md), zejména [kapitola o kartě](../10-build-a-filter/06-card.md). Spuštění a zastavení udržování tepla se deklarují jako akce karty v [kapitole 7](07-heating-control.md).
 
 ## Co tato kapitola obsahuje
 
@@ -66,7 +66,7 @@ Dále následuje postupná cesta od prázdné desky k pracující skříni:
 3. [Spuštění firmware na jádru](04-firmware-start.md) — projekt PlatformIO, první spuštění, vazba na portál.
 4. [Senzory](05-sensors.md) — připojujeme SHT31 a termistor, získáváme od nich data.
 5. [Menu z YAML](06-menu.md) — popisujeme nastavení zařízení, padá do NVS a na portál.
-6. [Řízení ohřevu](07-heating-control.md) — logika udržování teploty, ventilátor, příkazy z portálu.
+6. [Řízení ohřevu](07-heating-control.md) — logika udržování teploty, ventilátor, spuštění a zastavení z karty zařízení.
 7. [Montáž a kontrola](08-assembly-and-check.md) — konečná montáž, první nahřátí, bezpečnostní checklist.
 
 !!! tip "Hotový příklad"

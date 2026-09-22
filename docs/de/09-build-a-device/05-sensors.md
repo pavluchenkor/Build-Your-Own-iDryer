@@ -33,9 +33,6 @@ Es ist nicht nötig, den SHT31-Treiber von Grund auf zu schreiben — die fertig
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — Pins Ihres Boards
     s_climateOk = s_climate.begin();  // findet die Adresse 0x44 oder 0x45 selbst
     s_link.begin();
+    // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ Unten ist die gesamte Datei. Neue Zeilen relativ zum letzten Kapitel sind mit `/
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← Kapitel 5  (SDA, SCL — Pins Ihres Boards)
     s_climateOk = s_climate.begin();  // ← Kapitel 5
     s_link.begin();
+    // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

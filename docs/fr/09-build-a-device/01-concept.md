@@ -55,7 +55,7 @@ Quand l'appareil est assemblé sur `idryer-core` et lié au compte, vous obtenez
 - configuration des paramètres (température cible, hystérésis) via le menu de l'appareil.
 
 !!! note "Capteurs et contrôles personnalisés sur la fiche de l'appareil"
-    La fiche de l'appareil n'est pas limitée aux capacités du dictionnaire (`has*`). Via le card-manifest, le firmware peut déclarer n'importe quels capteurs et commandes personnalisés — ils apparaîtront automatiquement sur le portail et dans l'application. Comment faire — l'exemple transversal [« Filtre à air intelligent »](../10-build-a-filter/01-concept.md), notamment [le chapitre sur la fiche](../10-build-a-filter/06-card.md).
+    La fiche de l'appareil n'est pas limitée aux capacités du dictionnaire (`has*`). Via le card-manifest, le firmware peut déclarer n'importe quels capteurs et commandes personnalisés — ils apparaîtront automatiquement sur le portail et dans l'application. Comment faire — l'exemple transversal [« Filtre à air intelligent »](../10-build-a-filter/01-concept.md), notamment [le chapitre sur la fiche](../10-build-a-filter/06-card.md). Le démarrage et l'arrêt du maintien en chaleur se déclarent comme actions de la carte au [chapitre 7](07-heating-control.md).
 
 ## De quoi se compose cette section
 
@@ -66,7 +66,7 @@ Ensuite vient le chemin étape par étape d'une carte vierge à une armoire qui 
 3. [Démarrage du firmware sur le cœur](04-firmware-start.md) — projet PlatformIO, premier lancement, liaison au portail.
 4. [Capteurs](05-sensors.md) — connexion de SHT31 et thermistance, récupération des données.
 5. [Menu en YAML](06-menu.md) — description des paramètres de l'appareil, ils vont dans NVS et au portail.
-6. [Contrôle du chauffage](07-heating-control.md) — logique de maintien de la température, ventilateur, commandes du portail.
+6. [Contrôle du chauffage](07-heating-control.md) — logique de maintien de la température, ventilateur, démarrage et arrêt depuis la carte de l'appareil.
 7. [Assemblage et vérification](08-assembly-and-check.md) — assemblage final, premier réchauffement, liste de vérification de sécurité.
 
 !!! tip "Exemple complet"

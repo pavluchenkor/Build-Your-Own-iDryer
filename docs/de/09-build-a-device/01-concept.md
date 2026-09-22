@@ -55,7 +55,7 @@ Wenn das Gerät auf `idryer-core` gebaut und an ein Konto gebunden ist, erhalten
 - Parametereinstellung (Zieltemperatur, Hysterese) über das Geräte-Menü.
 
 !!! note "Eigene Sensoren und Steuerelemente auf der Gerätekarte"
-    Die Gerätekarte ist nicht auf die Wörterbuchfähigkeiten (`has*`) beschränkt. Über das Card-Manifest kann die Firmware beliebige eigene Sensoren und Steuerelemente deklarieren — sie erscheinen automatisch im Portal und in der App. Wie das funktioniert, zeigt das Durchgangsbeispiel [„Intelligenter Luftfilter"](../10-build-a-filter/01-concept.md), insbesondere [das Kapitel über die Karte](../10-build-a-filter/06-card.md).
+    Die Gerätekarte ist nicht auf die Wörterbuchfähigkeiten (`has*`) beschränkt. Über das Card-Manifest kann die Firmware beliebige eigene Sensoren und Steuerelemente deklarieren — sie erscheinen automatisch im Portal und in der App. Wie das funktioniert, zeigt das Durchgangsbeispiel [„Intelligenter Luftfilter"](../10-build-a-filter/01-concept.md), insbesondere [das Kapitel über die Karte](../10-build-a-filter/06-card.md). Start und Stopp der Wärmehaltung werden in [Kapitel 7](07-heating-control.md) als Aktionen der Karte deklariert.
 
 ## Was ist in diesem Abschnitt enthalten
 
@@ -66,7 +66,7 @@ Im Folgenden geht der Pfad Schritt für Schritt von der leeren Platine zum funkt
 3. [Firmware-Start auf dem Kern](04-firmware-start.md) – PlatformIO-Projekt, erster Start, Portalbindung.
 4. [Sensoren](05-sensors.md) – verbinden Sie SHT31 und Thermistor, lesen Sie Daten von ihnen.
 5. [Menü aus YAML](06-menu.md) – beschreiben Sie Geräteeinstellungen, sie landen in NVS und auf dem Portal.
-6. [Heizsteuerung](07-heating-control.md) – Logik zur Temperaturregelung, Lüfter, Portalbefehle.
+6. [Heizsteuerung](07-heating-control.md) – Logik zur Temperaturregelung, Lüfter, Start und Stopp über die Gerätekarte.
 7. [Montage und Überprüfung](08-assembly-and-check.md) – Endmontage, erste Erwärmung, Sicherheits-Checkliste.
 
 !!! tip "Fertiges Beispiel"

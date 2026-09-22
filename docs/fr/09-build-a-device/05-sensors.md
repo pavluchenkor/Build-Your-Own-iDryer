@@ -33,9 +33,6 @@ Vous n'avez pas besoin d'écrire le pilote SHT31 à partir de zéro — la class
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — broches de votre carte
     s_climateOk = s_climate.begin();  // trouve automatiquement l'adresse 0x44 ou 0x45
     s_link.begin();
+    // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ Ci-dessous — tout le fichier au complet. Les nouvelles lignes par rapport au c
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← chapitre 5  (SDA, SCL — broches de votre carte)
     s_climateOk = s_climate.begin();  // ← chapitre 5
     s_link.begin();
+    // Appareil dissocié sur le portail : effacer le secret, attendre une nouvelle association.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

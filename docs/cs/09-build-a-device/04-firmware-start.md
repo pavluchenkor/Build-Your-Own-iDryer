@@ -1,6 +1,6 @@
 ---
 title: "Spuštění firmwaru na idryer-core: první spuštění a vazba na portál"
-description: "Vytvoření projektu PlatformIO na knihovně idryer-core: platformio.ini, secrets.h, Config zařízení, první firmware pro ESP32 a vazba na portál iDryer."
+description: "Vytvoření projektu PlatformIO na knihovně idryer-core: platformio.ini, Config zařízení, první nahrání firmwaru do ESP32, nastavení Wi-Fi a propojení zařízení s portálem iDryer v aplikaci."
 ---
 
 # Spuštění firmwaru na jádru
@@ -16,6 +16,7 @@ Budete potřebovat:
 - VS Code s rozšířením PlatformIO;
 - USB kabel;
 - Wi-Fi síť `2.4 GHz` (ESP32 nefunguje se sítěmi pouze `5 GHz`).
+- chytrý telefon s aplikací iDryer přihlášenou k vašemu účtu na portálu iDryer: přes ni zařízení dostane síť Wi-Fi a propojí se s účtem.
 
 Co je firmware kontroléru a jak se dostane do desky — [Firmware kontroléru](../02-controllers/11-flashing-controller.md).
 
@@ -26,8 +27,6 @@ V PlatformIO je projekt složka s pevnou strukturou. Vytvořte složku projektu 
 ```text
 my-cabinet/
 ├── platformio.ini        # nastavení sestavení (vyplníme v kroku 4)
-├── include/
-│   └── secrets.h         # přihlášení a heslo Wi-Fi (krok 3)
 ├── lib/
 │   └── idryer-core/      # knihovna jádra (symlink nebo kopie)
 └── src/
@@ -44,16 +43,9 @@ ln -s /cesta/k/idryer-core lib/idryer-core
 
 To je také nutné pro generování menu (kapitola 6) — háček hledá generátor uvnitř `lib/idryer-core/`.
 
-## 3. Vytvořte secrets.h
+## 3. Wi-Fi a propojení nejsou v kódu
 
-Zkopírujte příklad `secrets.h.example` z knihovny do `include/secrets.h` vašeho projektu a zadejte údaje vaší sítě:
-
-```cpp
-#define WIFI_SSID      "your-ssid"
-#define WIFI_PASSWORD  "your-password"
-```
-
-Přidejte `include/secrets.h` do `.gitignore`, aby se heslo nedostalo do repozitáře.
+Firmware neobsahuje heslo k síti ani údaje účtu. Při prvním spuštění zařízení nemá Wi-Fi a čeká na nastavení: aplikace iDryer je pošle vzduchem (ESPTouch) a potom zařízení propojí s vaším účtem jednorázovým párovacím tokenem. Jádro to vše dělá uvnitř `s_link.begin()` a `s_link.loop()`, vy jen projdete kroky v aplikaci — oddíl 9.
 
 ## 4. Nakonfigurujte platformio.ini
 
@@ -65,12 +57,11 @@ platform    = espressif32
 framework   = arduino
 board       = esp32-c3-devkitm-1
 
-lib_deps =
-    bblanchon/ArduinoJson @ ^6.21.0
-    knolleary/PubSubClient
-    densaugeo/base64 @ ^1.4.0
-    links2004/WebSockets @ ^2.4.0
-    https://github.com/jnthas/Improv-WiFi-Library.git
+; Knihovny jádra (MQTT, ArduinoJson, WebSockets, Improv) přijdou
+; samy z lib/idryer-core/library.json.
+; ESPAsyncTCP je transport pro ESP8266 ze závislostí espMqttClient:
+; na ESP32 se nesestaví, je nutné ho vyloučit.
+lib_ignore = ESPAsyncTCP
 
 build_flags =
     -DIDRYER_API_BASE='"https://portal.idryer.org/api"'
@@ -81,8 +72,8 @@ build_flags =
 
 Nahraďte `board` svou deskou (například `esp32-s3-devkitc-1`). Samotnou `idryer-core` nemusíte zadávat v `lib_deps` — leží v `lib/` (krok 2).
 
-!!! note "Proč všechny tyto závislosti"
-    `ArduinoJson`, `PubSubClient`, `base64`, `WebSockets` a `Improv-WiFi-Library` potřebuje samotná knihovna `idryer-core` (MQTT, WebSocket přístup přes LAN, Wi-Fi provisioning). Bez kteréhokoli z nich se sestavení zhroutí s chybou jako `... .h: No such file`. Příznaky `MQTT_BROKER` a `MQTT_PORT` jsou také povinné — bez nich se jádro nemůže zkompilovat (`'MQTT_BROKER' was not declared`).
+!!! note "Co tyto řádky dělají"
+    Závislosti jádra nevypisujete: PlatformIO je vezme z `lib/idryer-core/library.json`. `lib_ignore = ESPAsyncTCP` je povinné — bez něj sestavení spadne v `ESPAsyncTCP.cpp`. Povinné jsou i příznaky `MQTT_BROKER` a `MQTT_PORT` — bez nich se jádro nezkompiluje (`'MQTT_BROKER' was not declared`).
 
 ## 5. Popište zařízení v Config
 
@@ -129,6 +120,8 @@ Ve stejném souboru za blokem `Config` přidejte funkce `setup()` a `loop()`. Pr
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -136,7 +129,7 @@ void loop() {
 }
 ```
 
-To stačí na to, aby se zařízení připojilo k Wi-Fi a vyšlo na portál. Senzory přidáme v kroku [Senzory](05-sensors.md).
+`s_link.begin()` spustí Wi-Fi, propojení a spojení s portálem. Příkaz `revoke` přijde z portálu, když zařízení od účtu odpojíte: `handleRevoke()` smaže tajný klíč zařízení a to čeká na nové propojení. Senzory přidáme v kroku [Senzory](05-sensors.md).
 
 ### Úplný `src/main.cpp` po této kapitole
 
@@ -164,6 +157,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -185,37 +180,45 @@ pio run -e cabinet -t upload
 pio device monitor -b 115200
 ```
 
-Očekávaná posloupnost v logu:
+Dokud zařízení nemá Wi-Fi, log mlčí: jádro drží sériový port pro webový instalátor (Improv). Logy se zapnou, jakmile naběhne Wi-Fi. U zařízení, které ještě není propojené, log končí takto:
 
 ```text
-[CLOUD] Connecting to WiFi...
-[CLOUD] WiFi connected, IP: 192.168.1.42
-[CLOUD] Provisioning device...
-[CLOUD] PIN: 1234567 (expires in 600s)
+[BOOT] WiFi ok, logs enabled
+[INFO ] CLOUD: WiFi connected, IP: 192.168.1.42, RSSI: -55 dBm, …
+…
+[INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-Pokud se zařízení zastavilo na řádku `PIN: ...` — to je normální. Přejděte na vazbu.
+Nechte monitor otevřený a přejděte do aplikace.
 
-## 9. Navažte zařízení na portál
+## 9. Připojte Wi-Fi a propojte zařízení v aplikaci
 
-1. Otevřete [portal.idryer.org](https://portal.idryer.org/).
-2. Přejděte do sekce **Add device**.
-3. Zadejte PIN ze Serial Monitor.
+1. Připojte telefon k síti Wi-Fi, ve které bude zařízení pracovat (`2.4 GHz`), a přihlaste se do aplikace iDryer svým účtem portálu.
+2. Na hlavní obrazovce klepněte na **Připojit nové zařízení** — otevře se krok **Wi-Fi**.
+3. Zkontrolujte název sítě (aplikace ho doplní sama, pokud je zapnutá poloha), zadejte heslo a klepněte na **Připojit zařízení**. Aplikace posílá nastavení až 90 sekund; když se zařízení připojí k síti, zobrazí se **Zařízení připojeno**. Klepněte na **Další**.
+4. V kroku **Spárování** klepněte na **Spárovat**. Aplikace najde zařízení v síti, získá od portálu jednorázový párovací token, předá ho zařízení a počká, až portál potvrdí, že je zařízení online.
+5. Po zprávě **Zařízení spárováno** se zařízení objeví v seznamu zařízení na portálu i v aplikaci.
 
-Po vazbě se zařízení přepne do stavu `Online`. V logu se objeví:
+Pokud už je zařízení v síti, otevřete rovnou krok **Spárování** — klepněte na jeho čip nahoře v okně.
+
+V logu je propojení vidět:
 
 ```text
-[CLOUD] Device claimed!
-[CLOUD] MQTT connected!
+[INFO ] CLOUD: binding-v3: pairing token received (… chars)
+[INFO ] CLOUD: binding-v3: activating with pairing token (serial=DEVICE_… mcu=-)
+[INFO ] CLOUD: binding-v3: activated, deviceId=… -> Ready
+…
+[INFO ] MQTT: Connected! …
 ```
 
 ## Ověření výsledku
 
-V tomto kroku by mělo být zařízení Online na portálu. Data ze senzorů zatím nejsou — to je očekávané. Pokud se zařízení nepřipojuje:
+V této fázi by mělo být zařízení na portálu Online. Data ze senzorů zatím nejsou — to je v pořádku. Pokud se něco nepovedlo:
 
-- ověřte, že síť `2.4 GHz` a heslo v `secrets.h` jsou správné;
-- ověřte napájení ESP32 (pokles napětí při startu Wi-Fi — časté ústí do restartů);
-- podívejte se na [Chyby napájení](../08-common-mistakes/02-power-mistakes.md) a [Chyby kontrolérů](../08-common-mistakes/04-controller-mistakes.md).
+- aplikace se nedočkala připojení zařízení k síti — zkontrolujte heslo a že síť je `2.4 GHz`; při špatném hesle zařízení znovu čeká na nastavení, zopakujte krok Wi-Fi;
+- v kroku **Spárování** aplikace zařízení nenašla — telefon a zařízení musí být ve stejné síti a síť nesmí blokovat vyhledávání zařízení (hostovské sítě to často dělají);
+- zařízení se restartuje — zkontrolujte napájení ESP32 (poklesy napětí při startu jsou častou příčinou resetů);
+- viz [Chyby napájení](../08-common-mistakes/02-power-mistakes.md) a [Chyby řadiče](../08-common-mistakes/04-controller-mistakes.md).
 
 ## Co dál
 

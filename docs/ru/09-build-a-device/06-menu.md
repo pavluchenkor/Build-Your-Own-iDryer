@@ -1,6 +1,6 @@
 ---
 title: "Меню устройства из YAML: настройки в NVS и на портале"
-description: "Как описать меню устройства на idryer-core в menu.yaml: целевая температура и гистерезис сохраняются в NVS и отображаются виджетами на портале iDryer."
+description: "Как описать меню устройства на idryer-core в menu.yaml: целевая температура и гистерезис сохраняются в NVS и показываются в меню устройства на портале iDryer."
 ---
 
 # Меню из YAML
@@ -14,7 +14,7 @@ description: "Как описать меню устройства на idryer-co
 После предыдущих шагов устройство читает датчики, но все пороги «зашиты» в код. Меню решает три задачи сразу:
 
 - **хранение**: значения переживают перезагрузку (NVS);
-- **управление с портала**: каждый параметр становится виджетом (слайдер, переключатель);
+- **управление с портала**: портал показывает каждый пункт меню по его типу (число, переключатель);
 - **единый источник правды**: один файл описывает и память, и интерфейс.
 
 ## Как работает
@@ -25,7 +25,7 @@ description: "Как описать меню устройства на idryer-co
 menu.yaml → (сборка pio run) → C++-файлы в src/menu/ + NVS + JSON для портала
 ```
 
-Пункт с полем `role:` виден порталу и отображается виджетом. Пункт без `role:` — приватный, только для внутренней логики устройства.
+Портал рисует каждый пункт меню по его типу. `role:` даёт пункту переведённую подпись из контракта ядра; пункт без `role:` показывается со своим `title`.
 
 !!! warning "Не редактируйте сгенерированные файлы"
     Файлы `menu_state.*`, `menu_bindings.*`, `menu_ids.h` и другие создаёт генератор. Правьте только `menu.yaml` и пересобирайте — иначе ваши изменения затрутся.
@@ -78,7 +78,7 @@ extra_scripts =                     ; ← добавили
 ```yaml
 - id: target_temp
   type: value
-  role: storage.target_temperature   # делает параметр виджетом на портале
+  role: storage.target_temperature   # подпись из контракта ядра
   title: { ru: "ТЕМПЕРАТУРА", en: "TARGET TEMP" }
   unit:  { ru: "°C", en: "°C" }
   vtype: uint16
@@ -109,12 +109,12 @@ extra_scripts =                     ; ← добавили
 ```
 
 !!! note "role: — это закрытый список"
-    Значение `role:` нельзя придумать произвольно — оно должно быть из списка `canonical_roles` контракта ядра. Если подходящей роли нет, сборка остановится и покажет список допустимых. Для шкафа хранения подходят роли семейства `storage.*`: `storage.target_temperature`, `storage.target_humidity`, `storage.start`, `storage.stop`. Полный список — в шапке `menu.template.yaml`. Параметры без `role:` (как гистерезис выше) работают как внутренние настройки: хранятся в NVS, но на портал не выводятся.
+    Значение `role:` нельзя придумать произвольно — оно должно быть из списка `canonical_roles` контракта ядра. Если подходящей роли нет, сборка остановится и покажет список допустимых. Для шкафа хранения подходят роли семейства `storage.*`: `storage.target_temperature`, `storage.target_humidity`, `storage.start`, `storage.stop`. Полный список — в шапке `menu.template.yaml`. `role:` необязателен: параметр без него (как гистерезис выше) хранится и публикуется так же, только подпись берётся из `title`.
 
 Ограничения, которые нельзя нарушать:
 
 - `bind` — не длиннее 15 символов (лимит ключа NVS);
-- не добавляйте поле `widget:` в `menu.yaml` — вид виджета определяет контракт по `role:`.
+- не добавляйте поле `widget:` в `menu.yaml` — портал и приложение его не читают: пункт меню рисуется по своему типу.
 
 !!! warning "Проверьте пункт ignore_external_cmd из шаблона"
     В шаблоне есть пункт `ignore_external_cmd`, и его `bind` — 19 символов, что превышает лимит 15. Если оставить как есть, генерация упадёт: `bind 'ignore_external_cmd' ... имеет 19 символов, лимит 15`. Либо удалите этот пункт, либо укоротите `bind` до `ign_ext_cmd` (как в реальных продуктах). Для базового шкафа его можно просто удалить.
@@ -140,21 +140,18 @@ src/menu/
 
 Если сборка упала с сообщением про неизвестную `role:` — значит роль написана не из списка `canonical_roles`. Исправьте её и пересоберите. Файлы с пометкой autogen руками не редактируйте.
 
-## Шаг 5. Подключите меню в главное
+## Шаг 5. Загрузите меню при старте
 
-Чтобы использовать код меню, подключите в `src/main.cpp` две вещи:
+Подключите сгенерированное меню в `src/main.cpp` и загрузите его в `setup()` — **до** `s_link.begin()`:
 
-1. Заголовок сгенерированного меню:
+```cpp
+#include <menu_state.h>      // объект menu со всеми параметрами
+#include <menu_bindings.h>   // menu_sync_state_to_cache, menu_apply_by_bind
 
-    ```cpp
-    #include <menu_state.h>      // объект menu со всеми параметрами
-    ```
-
-2. Загрузку дефолтов в `setup()` — **до** `s_link.begin()`:
-
-    ```cpp
-    menu.initDefaults();         // выставить значения по умолчанию из YAML
-    ```
+menu.initDefaults();         // выставить значения по умолчанию из YAML
+menu.loadFromNVS();          // сохранённые значения; при первом старте сохраняются дефолты
+menu_sync_state_to_cache();  // значения — в кэш, из которого собирается публикуемое меню
+```
 
 После этого параметры доступны через глобальный объект `menu`:
 
@@ -162,11 +159,72 @@ src/menu/
 uint16_t target = menu.target_temp;   // прямой доступ к значению
 ```
 
-Эти значения вы используете в логике нагрева на следующем шаге. Когда пользователь меняет параметр на портале, ядро само применяет новое значение и сохраняет его в NVS.
+## Шаг 6. Меню на портале: публикация и приём изменений
+
+Портал сам меню у устройства не читает: прошивка его публикует и применяет изменения, которые приходят обратно. Три части:
+
+- **публикация** — `menu_buildFullJson()` из ядра собирает JSON меню из `menu.yaml` и текущих значений; `devicePublisher()->publishConfigRaw()` отправляет его на портал (MQTT-топик `config`) и в приложение по локальной сети;
+- **когда** — при выходе устройства в онлайн и по команде `get_config`: портал присылает её, когда вы открываете меню устройства (шестерёнка на карточке);
+- **изменение** — портал присылает `set` с `id` пункта и новым значением `val`. `menu_apply_by_bind()` записывает значение в `menu`, в NVS и в кэш, затем меню публикуется заново, и портал показывает подтверждённое значение.
+
+Добавьте после заголовков:
+
+```cpp
+#include <menu_commands.h>                   // menu_buildFullJson
+#include <local_access/device_publisher.h>   // publishConfigRaw
+
+static bool s_menuPending = false;   // публиковать меню из loop()
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;              // пределы из menu.yaml
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);     // menu + NVS + кэш
+        s_menuPending = true;                          // показать новое значение на портале
+        return;
+    }
+}
+```
+
+В `setup()`, после `s_link.begin()`:
+
+```cpp
+s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
+```
+
+В `loop()`, после `s_link.loop()`:
+
+```cpp
+static bool s_wasOnline = false;
+const bool online = s_link.isOnline();
+if (online && !s_wasOnline) s_menuPending = true;   // только что вышли в онлайн
+s_wasOnline = online;
+if (s_menuPending) {
+    s_menuPending = false;
+    publishMenu();
+}
+```
+
+!!! note "Почему меню публикуется из loop()"
+    Колбэки команд вызываются глубоко в сетевом обработчике. Сборка JSON меню там стоит много стека, поэтому колбэк только поднимает флаг, а публикует `loop()`.
+
+`applySet()` зажимает значение в `min`/`max` пункта из `menu.yaml`: входящему числу устройство вслепую не доверяет.
 
 ## Полный `src/main.cpp` после этой главы
 
-Относительно прошлой главы добавились только две строки (помечены `// ← глава 6`): подключение меню и `menu.initDefaults()`.
+По сравнению с прошлой главой добавлены строки с пометкой `// ← глава 6`: загрузка меню, его публикация и приём изменений.
 
 ??? note "Что было — `src/main.cpp` после главы 5"
 
@@ -214,6 +272,8 @@ uint16_t target = menu.target_temp;   // прямой доступ к значе
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
         s_link.begin();
+        // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -236,7 +296,10 @@ uint16_t target = menu.target_temp;   // прямой доступ к значе
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
-#include <menu_state.h>           // ← глава 6
+#include <menu_state.h>                      // ← глава 6: параметры (menu.target_temp …)
+#include <menu_bindings.h>                   // ← глава 6: menu_apply_by_bind
+#include <menu_commands.h>                   // ← глава 6: menu_buildFullJson
+#include <local_access/device_publisher.h>   // ← глава 6: publishConfigRaw
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -271,16 +334,56 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← глава 6: меню на портале
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
     s_climateOk = s_climate.begin();
-    menu.initDefaults();           // ← глава 6
+    menu.initDefaults();                     // ← глава 6
+    menu.loadFromNVS();                      // ← глава 6
+    menu_sync_state_to_cache();              // ← глава 6
     s_link.begin();
+    // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← глава 6
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← глава 6
 }
 
 void loop() {
     s_link.loop();
+
+    // ← глава 6: публикуем меню при выходе в онлайн и по запросу
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -298,8 +401,9 @@ void loop() {
 
 После прошивки:
 
-- на портале в карточке устройства появляется настройка целевой температуры;
-- изменение значения на портале сохраняется и переживает перезагрузку;
+- шестерёнка на карточке устройства открывает страницу устройства с меню: целевая температура (портал подписывает её по роли — «Температура хранения») и **HYSTERESIS**;
+- измените там значение — устройство примет его, сохранит в NVS и заново опубликует меню, а портал покажет подтверждённое значение;
+- после перезагрузки устройство публикует сохранённые значения;
 - внутренние параметры (гистерезис) доступны в коде через `menu`.
 
 ## Что дальше

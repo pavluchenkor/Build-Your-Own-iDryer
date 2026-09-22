@@ -1,6 +1,6 @@
 ---
 title: "Старт прошивки на idryer-core: первый запуск и привязка к порталу"
-description: "Создание проекта PlatformIO на библиотеке idryer-core: platformio.ini, secrets.h, Config устройства, первая прошивка ESP32 и привязка к порталу iDryer."
+description: "Создание проекта PlatformIO на библиотеке idryer-core: platformio.ini, Config устройства, первая прошивка ESP32, настройка Wi-Fi и привязка устройства к порталу iDryer в приложении."
 ---
 
 # Старт прошивки на ядре
@@ -16,6 +16,7 @@ description: "Создание проекта PlatformIO на библиотек
 - VS Code с расширением PlatformIO;
 - USB-кабель;
 - Wi-Fi-сеть `2.4 GHz` (ESP32 не работает с сетями только `5 GHz`).
+- смартфон с приложением iDryer, в котором вы вошли в свой аккаунт портала iDryer: через него устройство получит сеть Wi-Fi и привяжется к аккаунту.
 
 Что такое прошивка контроллера и как она попадает в плату — [Прошивка контроллера](../02-controllers/11-flashing-controller.md).
 
@@ -26,8 +27,6 @@ description: "Создание проекта PlatformIO на библиотек
 ```text
 my-cabinet/
 ├── platformio.ini        # настройки сборки (заполним в шаге 4)
-├── include/
-│   └── secrets.h         # логин и пароль Wi-Fi (шаг 3)
 ├── lib/
 │   └── idryer-core/      # библиотека ядра (симлинк или копия)
 └── src/
@@ -44,16 +43,9 @@ ln -s /путь/к/idryer-core lib/idryer-core
 
 Это же требуется для генерации меню (глава 6) — хук ищет генератор внутри `lib/idryer-core/`.
 
-## 3. Создайте secrets.h
+## 3. Wi-Fi и привязка — не в коде
 
-Скопируйте пример `secrets.h.example` из библиотеки в `include/secrets.h` своего проекта и укажите данные своей сети:
-
-```cpp
-#define WIFI_SSID      "your-ssid"
-#define WIFI_PASSWORD  "your-password"
-```
-
-Добавьте `include/secrets.h` в `.gitignore`, чтобы пароль не попал в репозиторий.
+В прошивке нет ни пароля от сети, ни данных аккаунта. При первом запуске у устройства нет Wi-Fi, и оно ждёт настроек: приложение iDryer передаёт их по воздуху (ESPTouch), а затем привязывает устройство к вашему аккаунту одноразовым токеном привязки. Всё это ядро делает внутри `s_link.begin()` и `s_link.loop()`, вам остаётся пройти шаги в приложении — раздел 9.
 
 ## 4. Настройте platformio.ini
 
@@ -65,12 +57,11 @@ platform    = espressif32
 framework   = arduino
 board       = esp32-c3-devkitm-1
 
-lib_deps =
-    bblanchon/ArduinoJson @ ^6.21.0
-    knolleary/PubSubClient
-    densaugeo/base64 @ ^1.4.0
-    links2004/WebSockets @ ^2.4.0
-    https://github.com/jnthas/Improv-WiFi-Library.git
+; Библиотеки ядра (MQTT, ArduinoJson, WebSockets, Improv) приходят
+; сами из lib/idryer-core/library.json.
+; ESPAsyncTCP — транспорт ESP8266 из зависимостей espMqttClient:
+; на ESP32 он не собирается, его нужно исключить.
+lib_ignore = ESPAsyncTCP
 
 build_flags =
     -DIDRYER_API_BASE='"https://portal.idryer.org/api"'
@@ -81,8 +72,8 @@ build_flags =
 
 Замените `board` на свою плату (например, `esp32-s3-devkitc-1`). Саму `idryer-core` указывать в `lib_deps` не нужно — она лежит в `lib/` (шаг 2).
 
-!!! note "Зачем все эти зависимости"
-    `ArduinoJson`, `PubSubClient`, `base64`, `WebSockets` и `Improv-WiFi-Library` нужны самой библиотеке `idryer-core` (MQTT, WebSocket-доступ по LAN, Wi-Fi-provisioning). Без любой из них сборка упадёт с ошибкой вида `... .h: No such file`. Флаги `MQTT_BROKER` и `MQTT_PORT` тоже обязательны — без них ядро не скомпилируется (`'MQTT_BROKER' was not declared`).
+!!! note "Что делают эти строки"
+    Зависимости ядра перечислять не нужно: PlatformIO берёт их из `lib/idryer-core/library.json`. `lib_ignore = ESPAsyncTCP` обязателен — без него сборка падает в `ESPAsyncTCP.cpp`. Флаги `MQTT_BROKER` и `MQTT_PORT` тоже обязательны — без них ядро не скомпилируется (`'MQTT_BROKER' was not declared`).
 
 ## 5. Опишите устройство в Config
 
@@ -129,6 +120,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -136,7 +129,7 @@ void loop() {
 }
 ```
 
-Этого хватит, чтобы устройство подключилось к Wi-Fi и вышло на портал. Датчики добавим на шаге [Датчики](05-sensors.md).
+`s_link.begin()` поднимает Wi-Fi, привязку и связь с порталом. Команда `revoke` приходит с портала, когда устройство отвязывают от аккаунта: `handleRevoke()` стирает секрет устройства, и оно ждёт новой привязки. Датчики добавим на шаге [Датчики](05-sensors.md).
 
 ### Полный `src/main.cpp` после этой главы
 
@@ -164,6 +157,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -185,37 +180,45 @@ pio run -e cabinet -t upload
 pio device monitor -b 115200
 ```
 
-Ожидаемая последовательность в логе:
+Пока у устройства нет Wi-Fi, лог молчит: ядро держит последовательный порт для веб-установщика (Improv). Логи включаются, как только поднялся Wi-Fi. У ещё не привязанного устройства лог заканчивается так:
 
 ```text
-[CLOUD] Connecting to WiFi...
-[CLOUD] WiFi connected, IP: 192.168.1.42
-[CLOUD] Provisioning device...
-[CLOUD] PIN: 1234567 (expires in 600s)
+[BOOT] WiFi ok, logs enabled
+[INFO ] CLOUD: WiFi connected, IP: 192.168.1.42, RSSI: -55 dBm, …
+…
+[INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-Если устройство остановилось на строке `PIN: ...` — это нормально. Переходите к привязке.
+Оставьте монитор открытым и переходите к приложению.
 
-## 9. Привяжите устройство к порталу
+## 9. Подключите Wi-Fi и привяжите устройство в приложении
 
-1. Откройте [portal.idryer.org](https://portal.idryer.org/).
-2. Перейдите в раздел **Add device**.
-3. Введите PIN из Serial Monitor.
+1. Подключите телефон к той сети Wi-Fi, в которой будет работать устройство (`2.4 GHz`), и войдите в приложение iDryer под своим аккаунтом портала.
+2. На главном экране нажмите **Подключить новое устройство** — откроется шаг **Wi-Fi**.
+3. Проверьте название сети (приложение подставляет его само, если включена геолокация), введите пароль и нажмите **Подключить устройство**. Приложение передаёт настройки до 90 секунд; когда устройство подключится к сети, появится **Устройство подключено**. Нажмите **Далее**.
+4. На шаге **Привязка** нажмите **Привязать**. Приложение найдёт устройство в сети, получит у портала одноразовый токен привязки, передаст его устройству и дождётся, пока портал подтвердит, что устройство вышло на связь.
+5. После **Устройство привязано** оно появится в списке устройств на портале и в приложении.
 
-После привязки устройство перейдёт в статус `Online`. В логе появится:
+Если устройство уже в сети, сразу откройте шаг **Привязка** — нажмите его чип вверху окна.
+
+В логе видна привязка:
 
 ```text
-[CLOUD] Device claimed!
-[CLOUD] MQTT connected!
+[INFO ] CLOUD: binding-v3: pairing token received (… chars)
+[INFO ] CLOUD: binding-v3: activating with pairing token (serial=DEVICE_… mcu=-)
+[INFO ] CLOUD: binding-v3: activated, deviceId=… -> Ready
+…
+[INFO ] MQTT: Connected! …
 ```
 
 ## Проверка результата
 
-На этом шаге устройство должно быть Online на портале. Данных с датчиков пока нет — это ожидаемо. Если устройство не подключается:
+На этом этапе устройство должно быть Online на портале. Данных датчиков пока нет — это ожидаемо. Если что-то пошло не так:
 
-- проверьте, что сеть `2.4 GHz` и пароль в `secrets.h` верны;
-- проверьте питание ESP32 (просадки при старте Wi-Fi — частая причина перезагрузок);
-- смотрите [Ошибки питания](../08-common-mistakes/02-power-mistakes.md) и [Ошибки контроллеров](../08-common-mistakes/04-controller-mistakes.md).
+- приложение не дождалось подключения устройства к сети — проверьте пароль и что сеть `2.4 GHz`; при неверном пароле устройство снова ждёт настроек, повторите шаг Wi-Fi;
+- на шаге **Привязка** приложение не нашло устройство — телефон и устройство должны быть в одной сети, и сеть не должна блокировать обнаружение устройств (гостевые сети часто блокируют);
+- устройство перезагружается — проверьте питание ESP32 (просадки напряжения при старте — частая причина сбросов);
+- см. [Ошибки питания](../08-common-mistakes/02-power-mistakes.md) и [Ошибки контроллера](../08-common-mistakes/04-controller-mistakes.md).
 
 ## Что дальше
 

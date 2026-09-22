@@ -1,6 +1,6 @@
 ---
 title: "在 idryer-core 上启动固件：首次启动和绑定到门户网站"
-description: "在 idryer-core 库上创建 PlatformIO 项目：platformio.ini、secrets.h、Config 设备、首次 ESP32 固件和绑定到 iDryer 门户网站。"
+description: "基于 idryer-core 库创建 PlatformIO 项目：platformio.ini、设备 Config、首次烧录 ESP32、在应用中配置 Wi-Fi 并把设备绑定到 iDryer 门户。"
 ---
 
 # 在核心上启动固件
@@ -16,6 +16,7 @@ description: "在 idryer-core 库上创建 PlatformIO 项目：platformio.ini、
 - VS Code 与 PlatformIO 扩展；
 - USB 电缆；
 - `2.4 GHz` Wi-Fi 网络（ESP32 不适用于仅 `5 GHz` 网络）。
+- 一部装有 iDryer 应用并已登录 iDryer 门户账户的智能手机：设备通过它获得 Wi-Fi 网络并绑定到账户。
 
 什么是控制器固件以及它如何进入板——[刷入控制器](../02-controllers/11-flashing-controller.md)。
 
@@ -26,8 +27,6 @@ description: "在 idryer-core 库上创建 PlatformIO 项目：platformio.ini、
 ```text
 my-cabinet/
 ├── platformio.ini        # 构建设置（步骤 4 中填写）
-├── include/
-│   └── secrets.h         # Wi-Fi 登录名和密码（步骤 3）
 ├── lib/
 │   └── idryer-core/      # 核心库（符号链接或副本）
 └── src/
@@ -44,16 +43,9 @@ ln -s /path/to/idryer-core lib/idryer-core
 
 这也是菜单生成所需的（第 6 章）—— 钩子在 `lib/idryer-core/` 内查找生成器。
 
-## 3. 创建 secrets.h
+## 3. Wi-Fi 和绑定不写在代码里
 
-从库中复制 `secrets.h.example` 示例到项目的 `include/secrets.h` 并指定你的网络数据：
-
-```cpp
-#define WIFI_SSID      "your-ssid"
-#define WIFI_PASSWORD  "your-password"
-```
-
-将 `include/secrets.h` 添加到 `.gitignore`，以防密码进入存储库。
+固件中既没有网络密码，也没有账户数据。首次启动时设备没有 Wi-Fi，会等待配置：iDryer 应用通过无线方式（ESPTouch）发送配置，然后用一次性绑定令牌把设备绑定到你的账户。这些都由核心库在 `s_link.begin()` 和 `s_link.loop()` 中完成，你只需在应用中完成步骤——见第 9 节。
 
 ## 4. 配置 platformio.ini
 
@@ -65,12 +57,11 @@ platform    = espressif32
 framework   = arduino
 board       = esp32-c3-devkitm-1
 
-lib_deps =
-    bblanchon/ArduinoJson @ ^6.21.0
-    knolleary/PubSubClient
-    densaugeo/base64 @ ^1.4.0
-    links2004/WebSockets @ ^2.4.0
-    https://github.com/jnthas/Improv-WiFi-Library.git
+; 核心库的依赖（MQTT、ArduinoJson、WebSockets、Improv）
+; 会自动从 lib/idryer-core/library.json 引入。
+; ESPAsyncTCP 是 espMqttClient 依赖中的 ESP8266 传输层：
+; 它在 ESP32 上无法编译，必须排除。
+lib_ignore = ESPAsyncTCP
 
 build_flags =
     -DIDRYER_API_BASE='"https://portal.idryer.org/api"'
@@ -81,8 +72,8 @@ build_flags =
 
 将 `board` 替换为你的板（例如 `esp32-s3-devkitc-1`）。不需要在 `lib_deps` 中指定 `idryer-core` — 它在 `lib/` 中（步骤 2）。
 
-!!! note "所有这些依赖项的用途"
-    `ArduinoJson`、`PubSubClient`、`base64`、`WebSockets` 和 `Improv-WiFi-Library` 是 `idryer-core` 库本身所需的（MQTT、LAN 上的 WebSocket 访问、Wi-Fi 配置）。没有其中任何一个，构建都会失败，错误信息如 `... .h: No such file`。`MQTT_BROKER` 和 `MQTT_PORT` 标志也是强制性的 — 没有它们，核心将不会编译（`'MQTT_BROKER' was not declared`）。
+!!! note "这些行的作用"
+    无需列出核心库的依赖：PlatformIO 会从 `lib/idryer-core/library.json` 获取。`lib_ignore = ESPAsyncTCP` 是必需的——没有它，构建会在 `ESPAsyncTCP.cpp` 处失败。`MQTT_BROKER` 和 `MQTT_PORT` 标志也是必需的——没有它们核心库无法编译（`'MQTT_BROKER' was not declared`）。
 
 ## 5. 在 Config 中描述设备
 
@@ -129,6 +120,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // 设备在门户上被解绑：清除密钥，等待重新绑定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -136,7 +129,7 @@ void loop() {
 }
 ```
 
-这足以使设备连接到 Wi-Fi 并在门户网站上线。在[传感器](05-sensors.md)步骤添加传感器。
+`s_link.begin()` 会启动 Wi-Fi、绑定以及与门户的连接。当设备从账户解绑时，门户会发来 `revoke` 命令：`handleRevoke()` 清除设备密钥，设备随后等待重新绑定。传感器在[传感器](05-sensors.md)一步中添加。
 
 ### 本章后 `src/main.cpp` 的完整版本
 
@@ -164,6 +157,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // 设备在门户上被解绑：清除密钥，等待重新绑定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -179,43 +174,51 @@ void loop() {
 pio run -e cabinet -t upload
 ```
 
-## 8. 打开串行监视器
+## 8. 打开串口监视器
 
 ```bash
 pio device monitor -b 115200
 ```
 
-日志中的预期序列：
+在设备连上 Wi-Fi 之前，日志不会输出：核心库把串口留给网页安装程序（Improv）。Wi-Fi 一连上，日志就会开启。对于尚未绑定的设备，日志最后是这样的：
 
 ```text
-[CLOUD] Connecting to WiFi...
-[CLOUD] WiFi connected, IP: 192.168.1.42
-[CLOUD] Provisioning device...
-[CLOUD] PIN: 1234567 (expires in 600s)
+[BOOT] WiFi ok, logs enabled
+[INFO ] CLOUD: WiFi connected, IP: 192.168.1.42, RSSI: -55 dBm, …
+…
+[INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-如果设备在 `PIN: ...` 行上停止 — 这是正常的。转到绑定。
+保持监视器打开，转到应用。
 
-## 9. 将设备绑定到门户网站
+## 9. 在应用中连接 Wi-Fi 并绑定设备
 
-1. 打开 [portal.idryer.org](https://portal.idryer.org/)。
-2. 转到 **Add device** 部分。
-3. 输入来自串行监视器的 PIN。
+1. 把手机连接到设备将要使用的 Wi-Fi 网络（`2.4 GHz`），并用门户账户登录 iDryer 应用。
+2. 在首页点击 **连接新设备**——打开 **Wi-Fi** 步骤。
+3. 核对网络名称（开启定位时应用会自动填写），输入密码并点击 **连接设备**。应用最多发送 90 秒；设备加入网络后显示 **设备已连接**。点击 **下一步**。
+4. 在 **绑定** 步骤中点击 **绑定**。应用在网络中找到设备，从门户获取一次性绑定令牌并交给设备，然后等待门户确认设备已上线。
+5. 显示 **设备已绑定** 后，设备会出现在门户和应用的设备列表中。
 
-绑定后，设备将转换为 `Online` 状态。日志中将出现：
+如果设备已经在网络中，可以直接打开 **绑定** 步骤——点击窗口顶部的对应标签。
+
+日志中可以看到绑定过程：
 
 ```text
-[CLOUD] Device claimed!
-[CLOUD] MQTT connected!
+[INFO ] CLOUD: binding-v3: pairing token received (… chars)
+[INFO ] CLOUD: binding-v3: activating with pairing token (serial=DEVICE_… mcu=-)
+[INFO ] CLOUD: binding-v3: activated, deviceId=… -> Ready
+…
+[INFO ] MQTT: Connected! …
 ```
 
 ## 检查结果
 
-在此步骤中，设备应该在门户网站上处于在线状态。传感器没有数据 — 这是预期的。如果设备未连接：
+此时设备应在门户上显示为 Online。还没有传感器数据——这是正常的。如果出了问题：
 
-- 检查 `2.4 GHz` 网络以及 `secrets.h` 中的密码是否正确；
-- 检查 ESP32 的电源（启动时 Wi-Fi 的下降是重启的常见原因）；
-- 见[电源错误](../08-common-mistakes/02-power-mistakes.md)和[控制器错误](../08-common-mistakes/04-controller-mistakes.md)。
+- 应用没有等到设备加入网络——检查密码以及网络是否为 `2.4 GHz`；密码错误时设备会重新等待配置，请重复 Wi-Fi 步骤；
+- 在 **绑定** 步骤中应用没有找到设备——手机和设备必须在同一网络中，且网络不能阻止设备发现（访客网络常常会阻止）；
+- 设备反复重启——检查 ESP32 的供电（启动时的电压跌落是复位的常见原因）；
+- 参见[供电错误](../08-common-mistakes/02-power-mistakes.md)和[控制器错误](../08-common-mistakes/04-controller-mistakes.md)。
 
 ## 接下来
 

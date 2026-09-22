@@ -33,9 +33,6 @@ Não é necessário escrever driver SHT31 do zero - uma classe pronta `Sht31Clim
 
     ```ini
     lib_deps =
-        file://caminho/para/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — pinos da sua placa
     s_climateOk = s_climate.begin();  // encontra automaticamente 0x44 ou 0x45
     s_link.begin();
+    // Dispositivo desassociado no portal: apagar o segredo e aguardar nova vinculação.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ Abaixo está o ficheiro inteiro. Novas linhas em relação ao capítulo anterior
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // Dispositivo desassociado no portal: apagar o segredo e aguardar nova vinculação.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← capítulo 5  (SDA, SCL — pinos da sua placa)
     s_climateOk = s_climate.begin();  // ← capítulo 5
     s_link.begin();
+    // Dispositivo desassociado no portal: apagar o segredo e aguardar nova vinculação.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

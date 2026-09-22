@@ -1,6 +1,6 @@
 ---
 title: "來自YAML的設備菜單：NVS和門戶中的設定"
-description: "如何在idryer-core中的menu.yaml中描述設備菜單：目標溫度和滯後保存在NVS中，並在iDryer門戶上顯示為小部件。"
+description: "如何在idryer-core中的menu.yaml中描述設備菜單：目標溫度和滯後保存在NVS中，並顯示在iDryer門戶的設備選單中。"
 ---
 
 # YAML菜單
@@ -14,7 +14,7 @@ description: "如何在idryer-core中的menu.yaml中描述設備菜單：目標�
 在前面的步驟之後，設備讀取感應器，但所有閾值都"硬編碼"在程式碼中。菜單一次解決三個問題：
 
 - **儲存**：值在重啟後保持（NVS）；
-- **從門戶管理**：每個參數都變成小部件（滑塊、開關）；
+- **從門戶管理**：門戶依類型顯示每個選單項目（數值、開關）；
 - **唯一的事實來源**：一個檔案描述記憶體和介面。
 
 ## 工作原理
@@ -25,7 +25,7 @@ description: "如何在idryer-core中的menu.yaml中描述設備菜單：目標�
 menu.yaml → (pio run構建) → src/menu/中的C++檔案 + NVS + 門戶用JSON
 ```
 
-帶有`role:`欄位的項對門戶可見，並作為小部件顯示。不帶`role:`的項是私密的，僅用於設備內部邏輯。
+門戶依類型繪製每個選單項目。`role:`為項目提供來自核心契約的翻譯標籤；沒有`role:`的項目顯示其`title`。
 
 !!! warning "不要編輯生成的檔案"
     生成器建立`menu_state.*`、`menu_bindings.*`、`menu_ids.h`等檔案。只編輯`menu.yaml`並重新構建——否則你的更改將被抹去。
@@ -78,7 +78,7 @@ Hook會自動在`lib/idryer-core/menu/menu_gen.py`路徑中找到生成器，所
 ```yaml
 - id: target_temp
   type: value
-  role: storage.target_temperature   # 使參數在門戶上成為小部件
+  role: storage.target_temperature   # 來自核心契約的標籤
   title: { ru: "ТЕМПЕРАТУРА", en: "TARGET TEMP" }
   unit:  { ru: "°C", en: "°C" }
   vtype: uint16
@@ -109,12 +109,12 @@ Hook會自動在`lib/idryer-core/menu/menu_gen.py`路徑中找到生成器，所
 ```
 
 !!! note "role: — 這是一個封閉的清單"
-    `role:`的值不能隨意想象——它必須來自核心契約的`canonical_roles`列表。如果沒有合適的角色，構建將停止並顯示允許的列表。對於儲存櫃，`storage.*`家族的角色很合適：`storage.target_temperature`、`storage.target_humidity`、`storage.start`、`storage.stop`。完整清單——在`menu.template.yaml`的標題中。沒有`role:`的參數（如上面的滯後）作為內部設定工作：儲存在NVS中，但不輸出到門戶。
+    `role:`的值不能隨意想象——它必須來自核心契約的`canonical_roles`列表。如果沒有合適的角色，構建將停止並顯示允許的列表。對於儲存櫃，`storage.*`家族的角色很合適：`storage.target_temperature`、`storage.target_humidity`、`storage.start`、`storage.stop`。完整清單——在`menu.template.yaml`的標題中。`role:`是選用的：沒有它的參數（如上面的滯後）同樣會被儲存和發布，只是標籤取自`title`。
 
 不能違反的限制：
 
 - `bind` — 不超過15個字元（NVS鍵限制）；
-- 不要在`menu.yaml`中新增`widget:`欄位——小部件類型由`role:`契約決定。
+- 不要在`menu.yaml`中新增`widget:`欄位——門戶和應用程式都不讀取它：選單項目依其類型繪製。
 
 !!! warning "檢查範本中的ignore_external_cmd項目"
     在範本中有一個`ignore_external_cmd`項，其`bind`——19個字元，超過限制15。如果保留原樣，生成將失敗：`bind 'ignore_external_cmd' ... 有19個字元，限制15`。要麼刪除此項，要麼將`bind`縮短為`ign_ext_cmd`（如實際產品中）。對於基本櫃子，可以簡單地刪除它。
@@ -140,33 +140,91 @@ src/menu/
 
 如果構建因未知`role:`而失敗——角色不在`canonical_roles`清單中。修復它並重新構建。標記為autogen的檔案不要手動編輯。
 
-## 步驟5。在主程式中連接菜單
+## 步驟 5. 啟動時載入選單
 
-要使用菜單程式碼，在`src/main.cpp`中連接兩件事：
+在 `src/main.cpp` 中接入產生的選單，並在 `setup()` 中載入——**在** `s_link.begin()` **之前**：
 
-1. 生成菜單的標題：
+```cpp
+#include <menu_state.h>      // 帶有所有參數的menu物件
+#include <menu_bindings.h>   // menu_sync_state_to_cache, menu_apply_by_bind
 
-    ```cpp
-    #include <menu_state.h>      // 帶有所有參數的menu物件
-    ```
+menu.initDefaults();         // 從YAML設定預設值
+menu.loadFromNVS();          // 已儲存的值；首次啟動時儲存預設值
+menu_sync_state_to_cache();  // 把值寫入快取，發布的選單由此建立
+```
 
-2. 在`setup()`中載入預設值——**在`s_link.begin()`之前**：
-
-    ```cpp
-    menu.initDefaults();         // 從YAML設定預設值
-    ```
-
-之後，參數透過全域`menu`物件存取：
+之後即可透過全域物件 `menu` 存取參數：
 
 ```cpp
 uint16_t target = menu.target_temp;   // 直接存取值
 ```
 
-你在下一步的加熱邏輯中使用這些值。當使用者在門戶上更改參數時，核心會自動應用新值並將其儲存在NVS中。
+## 步驟 6. 門戶上的選單：發布並接收修改
+
+門戶不會自己從裝置讀取選單：由韌體發布選單，並套用傳回來的修改。分三部分：
+
+- **發布**——核心庫的 `menu_buildFullJson()` 根據 `menu.yaml` 和目前的值建立選單 JSON；`devicePublisher()->publishConfigRaw()` 把它傳送到門戶（MQTT 主題 `config`）並透過區域網路傳送到應用程式；
+- **時機**——裝置上線時以及收到 `get_config` 指令時：開啟裝置選單（卡片上的齒輪）時門戶會送出該指令；
+- **修改**——門戶送出帶有選單項目 `id` 和新值 `val` 的 `set`。`menu_apply_by_bind()` 把值寫入 `menu`、NVS 和快取，然後重新發布選單，門戶顯示已確認的值。
+
+在 include 之後加入：
+
+```cpp
+#include <menu_commands.h>                   // menu_buildFullJson
+#include <local_access/device_publisher.h>   // publishConfigRaw
+
+static bool s_menuPending = false;   // 在 loop() 中發布選單
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;              // menu.yaml 中的範圍
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);     // menu + NVS + 快取
+        s_menuPending = true;                          // 在門戶上顯示新值
+        return;
+    }
+}
+```
+
+在 `setup()` 中，`s_link.begin()` 之後：
+
+```cpp
+s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
+```
+
+在 `loop()` 中，`s_link.loop()` 之後：
+
+```cpp
+static bool s_wasOnline = false;
+const bool online = s_link.isOnline();
+if (online && !s_wasOnline) s_menuPending = true;   // 剛剛上線
+s_wasOnline = online;
+if (s_menuPending) {
+    s_menuPending = false;
+    publishMenu();
+}
+```
+
+!!! note "為什麼在 loop() 中發布選單"
+    指令回呼在網路處理程式深處被呼叫。在那裡建立選單 JSON 會占用大量堆疊空間，所以回呼只設定旗標，由 `loop()` 發布。
+
+`applySet()` 會把值限制在 `menu.yaml` 中該項目的 `min`/`max` 之間：裝置不會盲目信任收到的數字。
 
 ## 本章後的完整`src/main.cpp`
 
-相對於上一章只新增了兩行（標記為`// ← 第6章`）：菜單連接和`menu.initDefaults()`。
+與上一章相比，新增了標記為 `// ← 第6章` 的行：載入選單、發布選單以及接收修改。
 
 ??? note "第5章結束後的`src/main.cpp`"
 
@@ -214,6 +272,8 @@ uint16_t target = menu.target_temp;   // 直接存取值
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
         s_link.begin();
+        // 裝置在門戶上被解除綁定：清除金鑰，等待重新綁定。
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -236,7 +296,10 @@ uint16_t target = menu.target_temp;   // 直接存取值
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
-#include <menu_state.h>           // ← 第6章
+#include <menu_state.h>                      // ← 第6章：參數（menu.target_temp …）
+#include <menu_bindings.h>                   // ← 第6章：menu_apply_by_bind
+#include <menu_commands.h>                   // ← 第6章：menu_buildFullJson
+#include <local_access/device_publisher.h>   // ← 第6章：publishConfigRaw
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -271,16 +334,56 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← 第6章：門戶上的選單
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
     s_climateOk = s_climate.begin();
-    menu.initDefaults();           // ← 第6章
+    menu.initDefaults();                     // ← 第6章
+    menu.loadFromNVS();                      // ← 第6章
+    menu_sync_state_to_cache();              // ← 第6章
     s_link.begin();
+    // 裝置在門戶上被解除綁定：清除金鑰，等待重新綁定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← 第6章
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← 第6章
 }
 
 void loop() {
     s_link.loop();
+
+    // ← 第6章：上線時和收到請求時發布選單
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -298,9 +401,10 @@ void loop() {
 
 刷新後：
 
-- 在門戶設備卡中出現目標溫度設定；
-- 在門戶上改變值會被保存並在重啟後保持；
-- 內部參數（滯後）可透過`menu`在程式碼中存取。
+- 裝置卡片上的齒輪會開啟帶選單的裝置頁面：目標溫度（門戶依角色為其加標籤——「Storage temperature」）和 **HYSTERESIS**；
+- 在那裡修改一個值——裝置接受它、儲存到 NVS 並重新發布選單，門戶顯示已確認的值；
+- 重新啟動後裝置發布已儲存的值；
+- 內部參數（滯後）可在程式碼中透過 `menu` 存取。
 
 ## 下一步
 

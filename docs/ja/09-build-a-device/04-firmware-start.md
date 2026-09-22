@@ -1,6 +1,6 @@
 ---
 title: "idryer-coreでのファームウェア開始：最初の起動とポータルバインディング"
-description: "idryer-coreライブラリでPlatformIOプロジェクトを作成：platformio.ini、secrets.h、デバイス設定、ESP32最初のフラッシュ、iDryerポータルへのバインディング。"
+description: "idryer-coreライブラリでPlatformIOプロジェクトを作成：platformio.ini、デバイスのConfig、ESP32への最初の書き込み、アプリでのWi-Fi設定とiDryerポータルへのデバイスの紐付け。"
 ---
 
 # コアでのファームウェア開始
@@ -16,6 +16,7 @@ description: "idryer-coreライブラリでPlatformIOプロジェクトを作成
 - VS CodeとPlatformIOエクステンション；
 - USBケーブル；
 - Wi-Fi`2.4 GHz`ネットワーク（ESP32は5 GHzのみのネットワークで動作しません）。
+- iDryerポータルのアカウントでログインしたiDryerアプリ入りのスマートフォン：デバイスはアプリ経由でWi-Fiを受け取り、アカウントに紐付けられます。
 
 コントローラーファームウェアとボードへの入り方について - [コントローラーファームウェア](../02-controllers/11-flashing-controller.md)。
 
@@ -26,8 +27,6 @@ PlatformIOのプロジェクトは固定構造を持つフォルダーです。�
 ```text
 my-cabinet/
 ├── platformio.ini        # ビルド設定（ステップ4で入力）
-├── include/
-│   └── secrets.h         # Wi-Fiログインとパスワード（ステップ3）
 ├── lib/
 │   └── idryer-core/      # コアライブラリ（シムリンクまたはコピー）
 └── src/
@@ -44,16 +43,9 @@ ln -s /path/to/idryer-core lib/idryer-core
 
 これはメニュー生成（章6）にも必要です。フックは`lib/idryer-core/`内でジェネレーターを探します。
 
-## 3. secrets.hを作成する
+## 3. Wi-Fiと紐付けはコードに書かない
 
-ライブラリから`secrets.h.example`の例をプロジェクトの`include/secrets.h`にコピーし、ネットワークデータを指定してください：
-
-```cpp
-#define WIFI_SSID      "your-ssid"
-#define WIFI_PASSWORD  "your-password"
-```
-
-パスワードがリポジトリに入らないように、`include/secrets.h`を`.gitignore`に追加してください。
+ファームウェアにはネットワークのパスワードもアカウント情報も入っていません。初回起動時、デバイスにはWi-Fiがなく、設定を待ちます。iDryerアプリが設定を無線（ESPTouch）で送り、続いて使い捨ての紐付けトークンでデバイスをあなたのアカウントに紐付けます。これらはすべてコアが`s_link.begin()`と`s_link.loop()`の中で行います。あなたはアプリの手順を進めるだけです — セクション9。
 
 ## 4. platformio.iniを設定する
 
@@ -65,12 +57,11 @@ platform    = espressif32
 framework   = arduino
 board       = esp32-c3-devkitm-1
 
-lib_deps =
-    bblanchon/ArduinoJson @ ^6.21.0
-    knolleary/PubSubClient
-    densaugeo/base64 @ ^1.4.0
-    links2004/WebSockets @ ^2.4.0
-    https://github.com/jnthas/Improv-WiFi-Library.git
+; コアのライブラリ（MQTT、ArduinoJson、WebSockets、Improv）は
+; lib/idryer-core/library.json から自動で入ります。
+; ESPAsyncTCP は espMqttClient の依存に含まれる ESP8266 用トランスポートで、
+; ESP32 ではビルドできないため除外が必要です。
+lib_ignore = ESPAsyncTCP
 
 build_flags =
     -DIDRYER_API_BASE='"https://portal.idryer.org/api"'
@@ -81,8 +72,8 @@ build_flags =
 
 `board`を自分のボード（例えば、`esp32-s3-devkitc-1`）に置き換えます。`lib_deps`で`idryer-core`を指定する必要はありません。それは`lib/`（ステップ2）にあります。
 
-!!! note "これらすべての依存関係が必要な理由"
-    `ArduinoJson`、`PubSubClient`、`base64`、`WebSockets`、`Improv-WiFi-Library`は`idryer-core`ライブラリ自体（MQTT、LAN WebSocket アクセス、Wi-Fi プロビジョニング）に必要です。これらのいずれかなしで、ビルドは`... .h: No such file`のようなエラーで失敗します。`MQTT_BROKER`と`MQTT_PORT`フラグも必須です。それらがなければ、コアはコンパイルされません（`'MQTT_BROKER' was not declared`）。
+!!! note "これらの行の役割"
+    コアの依存関係を列挙する必要はありません。PlatformIOが`lib/idryer-core/library.json`から取得します。`lib_ignore = ESPAsyncTCP`は必須です — ないとビルドは`ESPAsyncTCP.cpp`で失敗します。`MQTT_BROKER`と`MQTT_PORT`のフラグも必須です — ないとコアはコンパイルできません（`'MQTT_BROKER' was not declared`）。
 
 ## 5. Configでデバイスを説明する
 
@@ -129,6 +120,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -136,7 +129,7 @@ void loop() {
 }
 ```
 
-これは、デバイスがWi-Fiに接続し、ポータルに移動するのに十分です。センサーは[センサー](05-sensors.md)のステップで追加します。
+`s_link.begin()`がWi-Fi、紐付け、ポータルとの接続を立ち上げます。`revoke`コマンドは、デバイスがアカウントから紐付け解除されたときにポータルから届きます。`handleRevoke()`がデバイスのシークレットを消去し、デバイスは新しい紐付けを待ちます。センサーは[センサー](05-sensors.md)のステップで追加します。
 
 ### この章の後の完全な`src/main.cpp`
 
@@ -164,6 +157,8 @@ static iDryer::Link s_link(CFG);
 void setup() {
     Serial.begin(115200);
     s_link.begin();
+    // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -185,37 +180,45 @@ pio run -e cabinet -t upload
 pio device monitor -b 115200
 ```
 
-ログの予想される順序：
+デバイスにWi-Fiがない間、ログは出ません。コアはシリアルポートをWebインストーラー（Improv）のために空けておくからです。Wi-Fiがつながるとすぐにログが有効になります。まだ紐付けされていないデバイスでは、ログは次のように終わります：
 
 ```text
-[CLOUD] Connecting to WiFi...
-[CLOUD] WiFi connected, IP: 192.168.1.42
-[CLOUD] Provisioning device...
-[CLOUD] PIN: 1234567 (expires in 600s)
+[BOOT] WiFi ok, logs enabled
+[INFO ] CLOUD: WiFi connected, IP: 192.168.1.42, RSSI: -55 dBm, …
+…
+[INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-デバイスが`PIN: ...`の行で停止した場合、それは正常です。バインディングに進みます。
+モニターは開いたままにして、アプリに進みます。
 
-## 9. デバイスをポータルにバインドする
+## 9. アプリでWi-Fiに接続し、デバイスを紐付ける
 
-1. [portal.idryer.org](https://portal.idryer.org/)を開きます。
-2. **デバイスを追加**セクションに進みます。
-3. シリアルモニターからPINを入力します。
+1. デバイスを使うWi-Fiネットワーク（`2.4 GHz`）に電話を接続し、ポータルのアカウントでiDryerアプリにログインします。
+2. ホーム画面で**新しいデバイスを接続**をタップすると、**Wi-Fi**ステップが開きます。
+3. ネットワーク名を確認し（位置情報がオンならアプリが自動で入力します）、パスワードを入力して**デバイスを接続**をタップします。アプリは最大90秒間設定を送信し、デバイスがネットワークに参加すると**デバイスが接続されました**と表示されます。**次へ**をタップします。
+4. **ペアリング**ステップで**ペアリング**をタップします。アプリはネットワーク上のデバイスを見つけ、ポータルから使い捨ての紐付けトークンを取得してデバイスに渡し、デバイスがオンラインになったことをポータルが確認するまで待ちます。
+5. **ペアリングが完了しました**の後、デバイスはポータルとアプリのデバイス一覧に表示されます。
 
-バインディングの後、デバイスは`Online`ステータスに移動します。ログに表示されます：
+デバイスがすでにネットワーク上にある場合は、すぐに**ペアリング**ステップを開いてください — ウィンドウ上部のチップをタップします。
+
+ログには紐付けが表示されます：
 
 ```text
-[CLOUD] Device claimed!
-[CLOUD] MQTT connected!
+[INFO ] CLOUD: binding-v3: pairing token received (… chars)
+[INFO ] CLOUD: binding-v3: activating with pairing token (serial=DEVICE_… mcu=-)
+[INFO ] CLOUD: binding-v3: activated, deviceId=… -> Ready
+…
+[INFO ] MQTT: Connected! …
 ```
 
 ## 結果の確認
 
-このステップで、デバイスはポータルでオンラインである必要があります。センサーからのデータはまだありません。それは予想されています。デバイスが接続していない場合：
+この段階で、デバイスはポータルでOnlineになっているはずです。センサーのデータはまだありませんが、それで問題ありません。うまくいかない場合：
 
-- ネットワークが`2.4 GHz`で、`secrets.h`のパスワードが正しいことを確認してください；
-- ESP32の電力を確認してください（Wi-Fi開始時の電圧低下は一般的な再起動原因です）；
-- [電力エラー](../08-common-mistakes/02-power-mistakes.md)と[コントローラーエラー](../08-common-mistakes/04-controller-mistakes.md)を参照してください。
+- アプリがデバイスのネットワーク参加を確認できなかった — パスワードとネットワークが`2.4 GHz`であることを確認してください。パスワードが間違っているとデバイスは再び設定待ちになるので、Wi-Fiステップをやり直します；
+- **ペアリング**ステップでアプリがデバイスを見つけられなかった — 電話とデバイスは同じネットワークにあり、ネットワークがデバイスの検出をブロックしていないこと（ゲストネットワークはよくブロックします）；
+- デバイスが再起動する — ESP32の電源を確認してください（起動時の電圧降下はリセットのよくある原因です）；
+- [電源の間違い](../08-common-mistakes/02-power-mistakes.md)と[コントローラーの間違い](../08-common-mistakes/04-controller-mistakes.md)を参照してください。
 
 ## 次のステップ
 

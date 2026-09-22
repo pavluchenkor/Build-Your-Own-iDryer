@@ -44,14 +44,20 @@ Os números de pino são os mesmos de [Esquema de conexão](03-wiring.md). Em `s
 
 Para um gabinete em `40–45 °C`, histerese simples é suficiente: o aquecimento liga e desliga em torno da meta. É mais simples que PID completo e para manutenção suave de calor funciona de forma confiável.
 
-A temperatura-alvo e histerese são tiradas do menu (`menu.target_temp`, `menu.hysteresis`) — ele já está conectado no [capítulo 6](06-menu.md). Adicione uma flag de estado e função de decisão:
+A histerese vem do menu (`menu.hysteresis`) — já conectado no [capítulo 6](06-menu.md). A temperatura alvo é definida pelo usuário ao iniciar o gabinete pelo cartão do dispositivo (`s_targetC`; o cartão é conectado mais adiante neste capítulo). Só aquece no modo Storage. Adicione o estado e a função de decisão:
 
 ```cpp
-static bool s_heating = false;
+static bool  s_heating = false;
+static float s_targetC = 0.0f;   // alvo da execução atual, do cartão
 
 static void controlLoop() {
+    // Aquecer só no modo Storage: depois de Parar, o gabinete esfria.
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) {
+        s_heating = false;
+        return;
+    }
     float air    = s_link.telemetry.airTempC[0];     // SHT31
-    float target = (float)menu.target_temp;          // do menu
+    float target = s_targetC;                        // do cartão
     float hyst   = (float)menu.hysteresis;           // do menu
 
     if (air < target - hyst) {
@@ -62,7 +68,7 @@ static void controlLoop() {
 }
 ```
 
-A temperatura-alvo e histerese são tiradas do [menu](06-menu.md) — o usuário as muda do portal.
+A temperatura alvo chega com o comando de partida vindo do cartão; seus limites e o valor padrão são o item `target_temp` do [menu](06-menu.md).
 
 ## Proteção do aquecedor por termistor
 
@@ -128,36 +134,66 @@ void loop() {
 
 Os campos de telemetria (`heaterPower01`, `fanOn`) a fachada publica automaticamente — no portal você vê se o dispositivo está aquecendo agora e se o ventilador está funcionando.
 
-## Comandos do portal
+## Cartão: partida e parada
 
-O portal envia iniciar e parar a manutenção de calor como comandos. O handler é registrado pelo método `s_link.onCommand(nome, callback)` — **depois** de `s_link.begin()`. Comandos de ação chegam com nome `invoke` e campo `action` (função do menu, por exemplo `storage.start` / `storage.stop`).
+A partida e a parada vêm do cartão do dispositivo no portal e no app. O firmware as declara como **ações** do cartão: o core as adiciona ao card manifest, e o portal e o app desenham o formulário e os botões. Não é preciso interpretar comandos no seu código — o core chama a sua função.
 
-Para análise JSON, você precisa dos cabeçalhos `<ArduinoJson.h>` e `<string.h>` (para `strcmp`) — adicione-os aos outros `#include` no início do arquivo. O próprio handler é definido em `setup()`:
+Os limites do campo de temperatura e o valor padrão vêm do item de menu `target_temp` (30–50 °C, 45) pela ponte `card_menu_bridge.h`. O valor digitado pelo usuário vai junto com o comando de partida e não é gravado no menu. Adicione o cabeçalho ao lado dos cabeçalhos do menu do capítulo 6:
 
 ```cpp
-s_link.onCommand("invoke", [](JsonObjectConst data) {
-    const char* action = data["action"] | "";
-    if (strcmp(action, "storage.start") == 0) {
-        s_heating = true;
-        s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-        s_link.status.targetTempC[0] = (float)menu.target_temp;
-        s_link.publishStatusNow();
-    } else if (strcmp(action, "storage.stop") == 0) {
-        s_heating = false;
-        myHeater.off();
-        s_link.status.mode[0] = iDryer::UnitMode::Idle;
-        s_link.publishStatusNow();
-    }
-});
+#include <card/card_menu_bridge.h>
 ```
 
-- `storage.start` / `storage.stop` — as mesmas funções que você definiu no [menu](06-menu.md); o portal desenha botões a partir delas.
-- `iDryer::UnitMode::Storage` — modo de manutenção suave de calor. Este é o modo principal do gabinete.
-- `s_link.status.mode[0]` e `targetTempC[0]` mostram no portal o estado atual da câmera.
-- Chame `publishStatusNow()` depois de cada mudança de status para que o portal veja imediatamente, não esperando pelo temporizador.
+Callbacks das ações — antes de `setup()`:
 
-!!! warning "Sem delay() no handler"
-    O handler `onCommand` é chamado de um callback de rede. Qualquer bloqueio dentro dele quebra a sessão MQTT. Mude flags e status, mas faça o trabalho real em `loop()`.
+```cpp
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();   // já dentro de 30..50
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+```
+
+Em `setup()`, depois dos comandos do menu do capítulo 6, declare as ações. Os valores do menu já estão no cache que o cartão lê: `setup()` chama `menu_sync_state_to_cache()` desde o capítulo 6.
+
+```cpp
+auto& card = s_link.card();
+idryer::card_menu::attach(card);
+card.action("storage", "STORAGE", onStorage)
+    .name("ru", "Хранение").name("en", "Storage")
+    .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+card.action("stop", "IDLE", onStop)
+    .name("ru", "Стоп").name("en", "Stop");
+```
+
+- `"STORAGE"` e `"IDLE"` — o modo da unidade depois da ação. Enquanto o gabinete está ocioso, o cartão mostra o formulário de partida; no modo `STORAGE`, o bloco de sessão e o botão Parar.
+- `MENU_TARGET_TEMP` — o id do item `target_temp`; o gerador o coloca em `menu_ids.h`.
+- `s_link.status.mode[0]` e `targetTempC[0]` mostram o estado atual da câmara. Chame `publishStatusNow()` depois de cada mudança para o cartão trocar na hora.
+- `iDryer::UnitMode::Storage` — modo de manutenção suave do calor. É o modo principal do gabinete.
+- Mude a temperatura de armazenamento no menu do dispositivo no portal — o valor padrão do campo do cartão acompanha: o core percebe sozinho a mudança do menu e publica o manifesto de novo.
+
+O core adiciona ao card manifest:
+
+```json
+"actions": [
+  {"id": "storage", "mode": "STORAGE", "name": {"ru": "Хранение", "en": "Storage"}, "action": "card.storage",
+   "params": [{"id": "temperature", "purpose": "target_temperature", "type": "number",
+               "limits": [30, 50], "step": 1, "default": 45, "unit": "°C"}]},
+  {"id": "stop", "mode": "IDLE", "name": {"ru": "Стоп", "en": "Stop"}, "action": "card.stop"}
+]
+```
+
+No portal, o cartão do gabinete ocioso ganha o campo `Temp.` com 45 °C e o botão `Armazenamento`; depois da partida, o bloco de sessão com o alvo e o botão `Parar`. No app, a tela inicial mostra as leituras e a sessão em andamento; partida e parada ficam na página do dispositivo. Sensores, campos e layout do cartão são tratados no capítulo [Cartão do dispositivo](../10-build-a-filter/06-card.md) da seção do filtro de ar.
+
+!!! warning "Nada de delay() nos callbacks"
+    Os callbacks das ações são chamados pelo handler de rede. Qualquer bloqueio dentro deles derruba a sessão MQTT. Mude o alvo e o status; o trabalho de verdade fica no `loop()`.
 
 ## Completo `src/main.cpp` após este capítulo
 
@@ -170,7 +206,10 @@ Este é o arquivo final e completo do dispositivo. Novas linhas em relação ao 
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
-    #include <menu_state.h>
+    #include <menu_state.h>                      // ← capítulo 6: parâmetros (menu.target_temp …)
+    #include <menu_bindings.h>                   // ← capítulo 6: menu_apply_by_bind
+    #include <menu_commands.h>                   // ← capítulo 6: menu_buildFullJson
+    #include <local_access/device_publisher.h>   // ← capítulo 6: publishConfigRaw
 
     static const iDryer::Config CFG = {
         .deviceType        = iDryer::DeviceType::Dryer,
@@ -205,16 +244,56 @@ Este é o arquivo final e completo do dispositivo. Novas linhas em relação ao 
         return tK - 273.15f;
     }
 
+    // ← capítulo 6: menu no portal
+    static bool s_menuPending = false;
+
+    static void publishMenu() {
+        static char buf[MENU_FULL_JSON_BUF_SIZE];
+        const size_t len = menu_buildFullJson(buf, sizeof(buf));
+        if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+    }
+
+    static void applySet(JsonObjectConst data) {
+        const int id = data["id"] | -1;
+        float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                         : data["val"].as<float>();
+        for (uint16_t i = 0; i < g_bindings_count; i++) {
+            if ((int)g_bindings[i].id != id) continue;
+            const MenuMeta& m = g_menu_meta[id];
+            if (v < m.min_val) v = m.min_val;
+            if (v > m.max_val) v = m.max_val;
+            menu_apply_by_bind(g_bindings[i].bind, v);
+            s_menuPending = true;
+            return;
+        }
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
-        menu.initDefaults();
+        menu.initDefaults();                     // ← capítulo 6
+        menu.loadFromNVS();                      // ← capítulo 6
+        menu_sync_state_to_cache();              // ← capítulo 6
         s_link.begin();
+        // Dispositivo desvinculado no portal: apagar o segredo e aguardar nova vinculação.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+        s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← capítulo 6
+        s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← capítulo 6
     }
 
     void loop() {
         s_link.loop();
+
+        // ← capítulo 6: publicar o menu ao ficar online e sob pedido
+        static bool s_wasOnline = false;
+        const bool online = s_link.isOnline();
+        if (online && !s_wasOnline) s_menuPending = true;
+        s_wasOnline = online;
+        if (s_menuPending) {
+            s_menuPending = false;
+            publishMenu();
+        }
 
         if (s_climateOk) {
             s_climate.tick(millis());
@@ -229,13 +308,15 @@ Este é o arquivo final e completo do dispositivo. Novas linhas em relação ao 
     ```
 
 ```cpp
-#include <Wire.h>
-#include <ArduinoJson.h>          // ← capítulo 7 (onCommand: JsonObjectConst)
-#include <string.h>              // ← capítulo 7 (strcmp)
-#include <math.h>
 #include <iDryer.h>
+#include <Wire.h>
+#include <math.h>
 #include "Sht31ClimateSensor.h"
 #include <menu_state.h>
+#include <menu_bindings.h>
+#include <menu_commands.h>
+#include <local_access/device_publisher.h>
+#include <card/card_menu_bridge.h>        // ← capítulo 7
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -270,6 +351,29 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 // ← capítulo 7: chaves do aquecedor e ventilador
 struct GpioOutput {
     int pin;
@@ -282,11 +386,13 @@ static GpioOutput myFan{5};
 
 // ← capítulo 7: lógica de manutenção de temperatura
 static bool        s_heating    = false;
+static float       s_targetC    = 0.0f;
 static const float HEATER_MAX_C = 80.0f;
 
 static void controlLoop() {
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) { s_heating = false; return; }
     float air    = s_link.telemetry.airTempC[0];
-    float target = (float)menu.target_temp;
+    float target = s_targetC;
     float hyst   = (float)menu.hysteresis;
     if (air < target - hyst)  s_heating = true;
     else if (air >= target)   s_heating = false;
@@ -304,6 +410,20 @@ static void applyFan() {
     s_link.telemetry.fanOn[0] = s_heating;
 }
 
+// ← capítulo 7: ações do cartão
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
@@ -311,26 +431,34 @@ void setup() {
     myHeater.begin();              // ← capítulo 7
     myFan.begin();                 // ← capítulo 7
     menu.initDefaults();
+    menu.loadFromNVS();
+    menu_sync_state_to_cache();
     s_link.begin();
+    // Dispositivo desvinculado no portal: apagar o segredo e aguardar nova vinculação.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
 
-    s_link.onCommand("invoke", [](JsonObjectConst data) {   // ← capítulo 7
-        const char* action = data["action"] | "";
-        if (strcmp(action, "storage.start") == 0) {
-            s_heating = true;
-            s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-            s_link.status.targetTempC[0] = (float)menu.target_temp;
-            s_link.publishStatusNow();
-        } else if (strcmp(action, "storage.stop") == 0) {
-            s_heating = false;
-            myHeater.off();
-            s_link.status.mode[0] = iDryer::UnitMode::Idle;
-            s_link.publishStatusNow();
-        }
-    });
+    auto& card = s_link.card();                          // ← capítulo 7
+    idryer::card_menu::attach(card);
+    card.action("storage", "STORAGE", onStorage)
+        .name("ru", "Хранение").name("en", "Storage")
+        .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+    card.action("stop", "IDLE", onStop)
+        .name("ru", "Стоп").name("en", "Stop");
 }
 
 void loop() {
     s_link.loop();
+
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -352,11 +480,11 @@ void loop() {
 
 Após este passo:
 
-- iniciar do portal coloca o gabinete no modo Storage, o dispositivo começa a aquecer;
+- o botão `Armazenamento` no cartão do dispositivo coloca o gabinete no modo Storage com a temperatura digitada, e o dispositivo começa a aquecer;
 - a temperatura do ar sobe até a meta e é mantida dentro da histerese;
 - o aquecedor não ultrapassa `HEATER_MAX_C`;
 - ventilador e potência de aquecimento são visíveis na telemetria;
-- parar do portal desliga o aquecimento e coloca em Idle.
+- o botão `Parar` desliga o aquecimento e passa para Idle; até a próxima partida o gabinete não aquece.
 
 ## O que vem a seguir
 

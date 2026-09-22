@@ -1,6 +1,6 @@
 ---
 title: "Nabídka zařízení z YAML: nastavení v NVS a na portálu"
-description: "Jak popsat nabídku zařízení v idryer-core v menu.yaml: cílová teplota a hystereze se ukládají v NVS a zobrazují se widgety na portálu iDryer."
+description: "Jak popsat nabídku zařízení v idryer-core v menu.yaml: cílová teplota a hystereze se ukládají v NVS a zobrazují se v menu zařízení na portálu iDryer."
 ---
 
 # Nabídka z YAML
@@ -14,7 +14,7 @@ Jedná se o jeden z klíčových prvků jádra. Nepíšete kód pro ukládání 
 Po předchozích krocích zařízení čte senzory, ale všechny prahy jsou „pevně zakódovány" v kódu. Nabídka řeší tři úkoly najednou:
 
 - **Ukládání**: hodnoty přežijí restart (NVS);
-- **Správa z portálu**: každý parametr se stane widgetem (posuvník, přepínač);
+- **Správa z portálu**: portál zobrazí každou položku menu podle jejího typu (číslo, přepínač);
 - **Jediný zdroj pravdy**: jeden soubor popisuje jak paměť, tak rozhraní.
 
 ## Jak to funguje
@@ -25,7 +25,7 @@ Jeden soubor `menu.yaml` prochází generátorem během sestavení:
 menu.yaml → (pio run) → C++-soubory v src/menu/ + NVS + JSON pro portál
 ```
 
-Položka s polem `role:` je viditelná portálu a zobrazuje se jako widget. Položka bez `role:` — je soukromá, pouze pro interní logiku zařízení.
+Portál kreslí každou položku menu podle jejího typu. `role:` dává položce přeložený popisek z kontraktu jádra; položka bez `role:` se zobrazí se svým `title`.
 
 !!! warning "Neupravujte vygenerované soubory"
     Soubory `menu_state.*`, `menu_bindings.*`, `menu_ids.h` a další vytváří generátor. Upravujte pouze `menu.yaml` a znovu sestavte — jinak budou vaše změny přepsány.
@@ -78,7 +78,7 @@ Cílová teplota skladování:
 ```yaml
 - id: target_temp
   type: value
-  role: storage.target_temperature   # učiní parametr widgetem na portálu
+  role: storage.target_temperature   # popisek z kontraktu jádra
   title: { ru: "ТЕМПЕРАТУРА", en: "TARGET TEMP" }
   unit:  { ru: "°C", en: "°C" }
   vtype: uint16
@@ -109,12 +109,12 @@ Hystereze (o kolik stupňů se může teplota snížit pod cíl, než se topení
 ```
 
 !!! note "role: — jedná se o uzavřený seznam"
-    Hodnotu `role:` nemůžete vymýšlet libovolně — musí pocházet ze seznamu `canonical_roles` smlouvy jádra. Pokud není vhodná role, sestavení se zastaví a zobrazí seznam povolených. Pro skříň skladování se hodí role z rodiny `storage.*`: `storage.target_temperature`, `storage.target_humidity`, `storage.start`, `storage.stop`. Úplný seznam je v záhlaví `menu.template.yaml`. Parametry bez `role:` (jako hystereze výše) fungují jako interní nastavení: ukládají se v NVS, ale nezveřejňují se na portálu.
+    Hodnotu `role:` nemůžete vymýšlet libovolně — musí pocházet ze seznamu `canonical_roles` smlouvy jádra. Pokud není vhodná role, sestavení se zastaví a zobrazí seznam povolených. Pro skříň skladování se hodí role z rodiny `storage.*`: `storage.target_temperature`, `storage.target_humidity`, `storage.start`, `storage.stop`. Úplný seznam je v záhlaví `menu.template.yaml`. `role:` je volitelná: parametr bez ní (jako hystereze výše) se ukládá i publikuje stejně, jen popisek se bere z `title`.
 
 Omezení, která nesmíte porušit:
 
 - `bind` — ne delší než 15 znaků (limit klíče NVS);
-- nepřidávejte pole `widget:` do `menu.yaml` — typ widgetu určuje smlouva podle `role:`.
+- nepřidávejte do `menu.yaml` pole `widget:` — portál ani aplikace ho nečtou: položka menu se kreslí podle svého typu.
 
 !!! warning "Zkontrolujte položku ignore_external_cmd ze šablony"
     V šabloně je položka `ignore_external_cmd` a její `bind` — 19 znaků, což překračuje limit 15. Pokud to ponecháte tak, jak to je, generování selhá: `bind 'ignore_external_cmd' ... má 19 znaků, limit je 15`. Buď odstraňte tuto položku, nebo zkraťte `bind` na `ign_ext_cmd` (jako v reálných produktech). Pro základní skříň jej můžete jednoduše odstranit.
@@ -140,33 +140,91 @@ src/menu/
 
 Pokud sestavení selhalo se zprávou o neznámé `role:` — znamená to, že role není ze seznamu `canonical_roles`. Opravte ji a znovu sestavte. Soubory označené autogen neupravujte ručně.
 
-## Krok 5. Připojte nabídku do hlavního souboru
+## Krok 5. Načtěte menu při startu
 
-Chcete-li použít kód nabídky, připojte do `src/main.cpp` dvě věci:
+Připojte vygenerované menu v `src/main.cpp` a načtěte ho v `setup()` — **před** `s_link.begin()`:
 
-1. Záhlaví vygenerované nabídky:
+```cpp
+#include <menu_state.h>      // objekt menu se všemi parametry
+#include <menu_bindings.h>   // menu_sync_state_to_cache, menu_apply_by_bind
 
-    ```cpp
-    #include <menu_state.h>      // objekt menu se všemi parametry
-    ```
+menu.initDefaults();         // nastavit výchozí hodnoty z YAML
+menu.loadFromNVS();          // uložené hodnoty; při prvním startu se uloží výchozí
+menu_sync_state_to_cache();  // hodnoty do cache, ze které se skládá publikované menu
+```
 
-2. Načtení výchozích hodnot v `setup()` — **před** `s_link.begin()`:
-
-    ```cpp
-    menu.initDefaults();         // nastavit výchozí hodnoty z YAML
-    ```
-
-Poté jsou parametry přístupné přes globální objekt `menu`:
+Potom jsou parametry dostupné přes globální objekt `menu`:
 
 ```cpp
 uint16_t target = menu.target_temp;   // přímý přístup k hodnotě
 ```
 
-Tyto hodnoty používáte v logice topení v dalším kroku. Když uživatel změní parametr na portálu, jádro automaticky aplikuje novou hodnotu a uloží ji do NVS.
+## Krok 6. Menu na portálu: publikace a příjem změn
+
+Portál si menu ze zařízení sám nečte: firmware ho publikuje a aplikuje změny, které přijdou zpět. Tři části:
+
+- **publikace** — `menu_buildFullJson()` z jádra sestaví JSON menu z `menu.yaml` a aktuálních hodnot; `devicePublisher()->publishConfigRaw()` ho pošle na portál (MQTT topic `config`) a do aplikace po místní síti;
+- **kdy** — když zařízení přejde online a na příkaz `get_config`: portál ho pošle, když otevřete menu zařízení (ozubené kolo na kartě);
+- **změna** — portál pošle `set` s `id` položky a novou hodnotou `val`. `menu_apply_by_bind()` zapíše hodnotu do `menu`, do NVS a do cache, pak se menu publikuje znovu a portál ukáže potvrzenou hodnotu.
+
+Přidejte za hlavičky:
+
+```cpp
+#include <menu_commands.h>                   // menu_buildFullJson
+#include <local_access/device_publisher.h>   // publishConfigRaw
+
+static bool s_menuPending = false;   // publikovat menu z loop()
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;              // meze z menu.yaml
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);     // menu + NVS + cache
+        s_menuPending = true;                          // ukázat novou hodnotu na portálu
+        return;
+    }
+}
+```
+
+V `setup()`, za `s_link.begin()`:
+
+```cpp
+s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
+```
+
+V `loop()`, za `s_link.loop()`:
+
+```cpp
+static bool s_wasOnline = false;
+const bool online = s_link.isOnline();
+if (online && !s_wasOnline) s_menuPending = true;   // právě jsme přešli online
+s_wasOnline = online;
+if (s_menuPending) {
+    s_menuPending = false;
+    publishMenu();
+}
+```
+
+!!! note "Proč se menu publikuje z loop()"
+    Callbacky příkazů se volají hluboko v síťovém handleru. Sestavit tam JSON menu stojí hodně zásobníku, proto callback jen nastaví příznak a publikuje `loop()`.
+
+`applySet()` omezí hodnotu na `min`/`max` položky z `menu.yaml`: příchozímu číslu zařízení slepě nevěří.
 
 ## Kompletní `src/main.cpp` po této kapitole
 
-Relativně k předchozí kapitole byly přidány pouze dva řádky (označeny `// ← kapitola 6`): připojení nabídky a `menu.initDefaults()`.
+Oproti předchozí kapitole přibyly řádky označené `// ← kapitola 6`: načtení menu, jeho publikace a příjem změn.
 
 ??? note "Co bylo — `src/main.cpp` po kapitole 5"
 
@@ -214,6 +272,8 @@ Relativně k předchozí kapitole byly přidány pouze dva řádky (označeny `/
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
         s_link.begin();
+        // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -236,7 +296,10 @@ Relativně k předchozí kapitole byly přidány pouze dva řádky (označeny `/
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
-#include <menu_state.h>           // ← kapitola 6
+#include <menu_state.h>                      // ← kapitola 6: parametry (menu.target_temp …)
+#include <menu_bindings.h>                   // ← kapitola 6: menu_apply_by_bind
+#include <menu_commands.h>                   // ← kapitola 6: menu_buildFullJson
+#include <local_access/device_publisher.h>   // ← kapitola 6: publishConfigRaw
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -271,16 +334,56 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← kapitola 6: menu na portálu
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
     s_climateOk = s_climate.begin();
-    menu.initDefaults();           // ← kapitola 6
+    menu.initDefaults();                     // ← kapitola 6
+    menu.loadFromNVS();                      // ← kapitola 6
+    menu_sync_state_to_cache();              // ← kapitola 6
     s_link.begin();
+    // Zařízení bylo na portálu odpojeno: smazat tajný klíč, čekat na nové spárování.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← kapitola 6
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← kapitola 6
 }
 
 void loop() {
     s_link.loop();
+
+    // ← kapitola 6: publikujeme menu po přechodu online a na žádost
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -298,9 +401,10 @@ void loop() {
 
 Po nahrání firmwaru:
 
-- na portálu v kartě zařízení se zobrazí nastavení cílové teploty;
-- změna hodnoty na portálu se uloží a přežije restart;
-- interní parametry (hystereze) jsou přístupné v kódu přes `menu`.
+- ozubené kolo na kartě zařízení otevře stránku zařízení s menu: cílová teplota (portál ji popíše podle role — „Storage temperature“) a **HYSTERESIS**;
+- změňte tam hodnotu — zařízení ji přijme, uloží do NVS a znovu publikuje menu a portál ukáže potvrzenou hodnotu;
+- po restartu zařízení publikuje uložené hodnoty;
+- interní parametry (hystereze) jsou v kódu dostupné přes `menu`.
 
 ## Co dále
 

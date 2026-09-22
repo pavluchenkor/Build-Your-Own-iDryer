@@ -33,9 +33,6 @@ SHT31ドライバーをゼロから書く必要はありません。既成のク
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA、SCL - ボードのピン
     s_climateOk = s_climate.begin();  // 自動的にアドレス0x44または0x45を検出
     s_link.begin();
+    // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← 章5（SDA、SCL - ボードのピン）
     s_climateOk = s_climate.begin();  // ← 章5
     s_link.begin();
+    // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

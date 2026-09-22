@@ -33,9 +33,6 @@ SHT31驅動程式無需從頭寫起——現成的`Sht31ClimateSensor`類在`iDr
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — 你的板的引腳
     s_climateOk = s_climate.begin();  // 自動尋找位址0x44或0x45
     s_link.begin();
+    // 裝置在門戶上被解除綁定：清除金鑰，等待重新綁定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // 裝置在門戶上被解除綁定：清除金鑰，等待重新綁定。
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← 第5章（SDA, SCL — 你的板的引腳）
     s_climateOk = s_climate.begin();  // ← 第5章
     s_link.begin();
+    // 裝置在門戶上被解除綁定：清除金鑰，等待重新綁定。
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

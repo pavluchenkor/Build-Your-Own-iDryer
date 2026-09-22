@@ -33,9 +33,6 @@ No es necesario escribir el controlador SHT31 desde cero — la clase lista `Sht
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — pines de su placa
     s_climateOk = s_climate.begin();  // encuentra automáticamente la dirección 0x44 o 0x45
     s_link.begin();
+    // El dispositivo se desvinculó en el portal: borrar el secreto y esperar una nueva vinculación.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ A continuación — el archivo completo. Las nuevas líneas con respecto al cap�
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // El dispositivo se desvinculó en el portal: borrar el secreto y esperar una nueva vinculación.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← capítulo 5  (SDA, SCL — pines de su placa)
     s_climateOk = s_climate.begin();  // ← capítulo 5
     s_link.begin();
+    // El dispositivo se desvinculó en el portal: borrar el secreto y esperar una nueva vinculación.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

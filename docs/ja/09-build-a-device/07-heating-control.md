@@ -44,14 +44,20 @@ static GpioOutput myFan{5};      // GPIO5 - ファン制御
 
 `40～45 °C`のシャフトの場合、単純なヒステリシスで十分です：ヒートは目標周辺でオン/オフします。これはフル機能のPIDよりもシンプルで、温かい保持に確実に機能します。
 
-目標温度とヒステリシスはメニュー（`menu.target_temp`、`menu.hysteresis`）から取得します。[6章](06-menu.md)で既に接続されています。フラグと決定関数を追加：
+ヒステリシスはメニュー（`menu.hysteresis`）から取ります。メニューは[第6章](06-menu.md)ですでに接続済みです。目標温度は、ユーザーがデバイスカードからキャビネットを起動するときに設定します（`s_targetC`。カードはこの章の後半で接続します）。加熱するのは Storage モードのときだけです。状態と判定関数を追加します：
 
 ```cpp
-static bool s_heating = false;
+static bool  s_heating = false;
+static float s_targetC = 0.0f;   // 現在の運転の目標値（カードから）
 
 static void controlLoop() {
+    // Storage モードのときだけ加熱：停止後はキャビネットが冷える
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) {
+        s_heating = false;
+        return;
+    }
     float air    = s_link.telemetry.airTempC[0];     // SHT31
-    float target = (float)menu.target_temp;          // メニューから
+    float target = s_targetC;                        // カードから
     float hyst   = (float)menu.hysteresis;           // メニューから
 
     if (air < target - hyst) {
@@ -62,7 +68,7 @@ static void controlLoop() {
 }
 ```
 
-目標温度とヒステリシスは[メニュー](06-menu.md)から取得されます。ユーザーはポータルから変更します。
+目標温度はカードからの起動コマンドと一緒に届きます。その範囲とデフォルト値は[メニュー](06-menu.md)の項目 `target_temp` です。
 
 ## 温度計による加熱器保護
 
@@ -128,36 +134,66 @@ void loop() {
 
 テレメトリーフィールド（`heaterPower01`、`fanOn`）はファサード自身で発行されます。ポータルに現在ヒートしているかとファンが動作しているかが見えます。
 
-## ポータルコマンド
+## カード：起動と停止
 
-ヒート保持の開始と停止はポータルからコマンドとして送信されます。ハンドラーはメソッド`s_link.onCommand(name, callback)`で登録されます。`s_link.begin()`の**後**。アクション命令は名前`invoke`で来て、フィールド`action`（メニューロール、例：`storage.start` / `storage.stop`）を持っています。
+起動と停止は、ポータルとアプリのデバイスカードから届きます。ファームウェアはこれをカードの **アクション** として宣言します。コアがそれを card マニフェストに追加し、ポータルとアプリがフォームとボタンを自分で描画します。コード内でコマンドを解析する必要はありません。コアがあなたの関数を呼びます。
 
-JSONを解析するには、`<ArduinoJson.h>`と`<string.h>`（`strcmp`用）ヘッダーが必要です。ファイルの`#include`の開始部に追加します。ハンドラー自身は`setup()`に配置されます：
+温度フィールドの範囲とデフォルト値は、ブリッジ `card_menu_bridge.h` を通じてメニュー項目 `target_temp`（30〜50 °C、45）から取ります。ユーザーが入力した値は起動コマンドと一緒に送られ、メニューには書き込まれません。第6章のメニューのヘッダーの隣にヘッダーを追加します：
 
 ```cpp
-s_link.onCommand("invoke", [](JsonObjectConst data) {
-    const char* action = data["action"] | "";
-    if (strcmp(action, "storage.start") == 0) {
-        s_heating = true;
-        s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-        s_link.status.targetTempC[0] = (float)menu.target_temp;
-        s_link.publishStatusNow();
-    } else if (strcmp(action, "storage.stop") == 0) {
-        s_heating = false;
-        myHeater.off();
-        s_link.status.mode[0] = iDryer::UnitMode::Idle;
-        s_link.publishStatusNow();
-    }
-});
+#include <card/card_menu_bridge.h>
 ```
 
-- `storage.start` / `storage.stop` - [メニュー](06-menu.md)で設定した同じロール；ポータルはそれらによってボタンを描画します。
-- `iDryer::UnitMode::Storage` - ソフト暖かい保持モード。これはシャフトの主要モードです。
-- `s_link.status.mode[0]`と`targetTempC[0]`はポータルのカメラの現在の状態を表示します。
-- タイマーを待つのではなく、ポータルがすぐにそれを見られるように、ステータス変更後に`publishStatusNow()`を呼び出してください。
+アクションのコールバック — `setup()` の前に：
 
-!!! warning "ハンドラーで遅延をしない"
-    `onCommand`ハンドラーはネットワークコールバックから呼び出されます。その内部のブロッキングはMQTTセッションを破ります。フラグとステータスを変更し、実際の作業は`loop()`で行ってください。
+```cpp
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();   // すでに 30..50 の範囲内
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+```
+
+`setup()`で、第6章のメニューのコマンドの後にアクションを宣言します。メニューの値はすでにカードが読むキャッシュにあります。第6章から`setup()`が`menu_sync_state_to_cache()`を呼んでいるためです。
+
+```cpp
+auto& card = s_link.card();
+idryer::card_menu::attach(card);
+card.action("storage", "STORAGE", onStorage)
+    .name("ru", "Хранение").name("en", "Storage")
+    .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+card.action("stop", "IDLE", onStop)
+    .name("ru", "Стоп").name("en", "Stop");
+```
+
+- `"STORAGE"` と `"IDLE"` — アクション後のユニットのモード。キャビネットが待機中はカードが起動フォームを表示し、モードが `STORAGE` のときはセッションブロックと停止ボタンを表示します。
+- `MENU_TARGET_TEMP` — 項目 `target_temp` の id。ジェネレーターが `menu_ids.h` に書き出します。
+- `s_link.status.mode[0]` と `targetTempC[0]` はチャンバーの現在の状態を示します。変更のたびに `publishStatusNow()` を呼ぶと、カードがすぐに切り替わります。
+- `iDryer::UnitMode::Storage` — 穏やかな保温モード。キャビネットの主要なモードです。
+- ポータルのデバイスメニューで保管温度を変えると、カードのフィールドのデフォルト値もそれに従います。コアがメニューの変更を自分で検知し、マニフェストを再公開します。
+
+コアは card マニフェストに次を追加します：
+
+```json
+"actions": [
+  {"id": "storage", "mode": "STORAGE", "name": {"ru": "Хранение", "en": "Storage"}, "action": "card.storage",
+   "params": [{"id": "temperature", "purpose": "target_temperature", "type": "number",
+               "limits": [30, 50], "step": 1, "default": 45, "unit": "°C"}]},
+  {"id": "stop", "mode": "IDLE", "name": {"ru": "Стоп", "en": "Stop"}, "action": "card.stop"}
+]
+```
+
+ポータルでは、待機中のキャビネットのカードに `温度` フィールド（45 °C）と `保管` ボタンが表示されます。起動後は、目標値付きのセッションブロックと `停止` ボタンです。アプリでは、ホーム画面に測定値と実行中のセッションが表示され、起動と停止はデバイスページにあります。カードのセンサー、フィールド、レイアウトは、エアフィルターのセクションの章[デバイスカード](../10-build-a-filter/06-card.md)で説明しています。
+
+!!! warning "コールバック内で delay() を使わない"
+    アクションのコールバックはネットワークハンドラーから呼ばれます。内部でブロックすると MQTT セッションが切れます。目標値とステータスだけを変更し、実際の処理は `loop()` で行ってください。
 
 ## この章の後の完全な`src/main.cpp`
 
@@ -170,7 +206,10 @@ s_link.onCommand("invoke", [](JsonObjectConst data) {
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
-    #include <menu_state.h>
+    #include <menu_state.h>                      // ← 章6：パラメーター（menu.target_temp …）
+    #include <menu_bindings.h>                   // ← 章6：menu_apply_by_bind
+    #include <menu_commands.h>                   // ← 章6：menu_buildFullJson
+    #include <local_access/device_publisher.h>   // ← 章6：publishConfigRaw
 
     static const iDryer::Config CFG = {
         .deviceType        = iDryer::DeviceType::Dryer,
@@ -205,16 +244,56 @@ s_link.onCommand("invoke", [](JsonObjectConst data) {
         return tK - 273.15f;
     }
 
+    // ← 章6：ポータルのメニュー
+    static bool s_menuPending = false;
+
+    static void publishMenu() {
+        static char buf[MENU_FULL_JSON_BUF_SIZE];
+        const size_t len = menu_buildFullJson(buf, sizeof(buf));
+        if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+    }
+
+    static void applySet(JsonObjectConst data) {
+        const int id = data["id"] | -1;
+        float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                         : data["val"].as<float>();
+        for (uint16_t i = 0; i < g_bindings_count; i++) {
+            if ((int)g_bindings[i].id != id) continue;
+            const MenuMeta& m = g_menu_meta[id];
+            if (v < m.min_val) v = m.min_val;
+            if (v > m.max_val) v = m.max_val;
+            menu_apply_by_bind(g_bindings[i].bind, v);
+            s_menuPending = true;
+            return;
+        }
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
-        menu.initDefaults();
+        menu.initDefaults();                     // ← 章6
+        menu.loadFromNVS();                      // ← 章6
+        menu_sync_state_to_cache();              // ← 章6
         s_link.begin();
+        // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+        s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← 章6
+        s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← 章6
     }
 
     void loop() {
         s_link.loop();
+
+        // ← 章6：オンライン時と要求時にメニューを公開
+        static bool s_wasOnline = false;
+        const bool online = s_link.isOnline();
+        if (online && !s_wasOnline) s_menuPending = true;
+        s_wasOnline = online;
+        if (s_menuPending) {
+            s_menuPending = false;
+            publishMenu();
+        }
 
         if (s_climateOk) {
             s_climate.tick(millis());
@@ -229,13 +308,15 @@ s_link.onCommand("invoke", [](JsonObjectConst data) {
     ```
 
 ```cpp
-#include <Wire.h>
-#include <ArduinoJson.h>          // ← 章7（onCommand：JsonObjectConst）
-#include <string.h>              // ← 章7（strcmp）
-#include <math.h>
 #include <iDryer.h>
+#include <Wire.h>
+#include <math.h>
 #include "Sht31ClimateSensor.h"
 #include <menu_state.h>
+#include <menu_bindings.h>
+#include <menu_commands.h>
+#include <local_access/device_publisher.h>
+#include <card/card_menu_bridge.h>        // ← 章7
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -270,6 +351,29 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 // ← 章7：加熱器とファンのキー
 struct GpioOutput {
     int pin;
@@ -282,11 +386,13 @@ static GpioOutput myFan{5};
 
 // ← 章7：温度保持ロジック
 static bool        s_heating    = false;
+static float       s_targetC    = 0.0f;
 static const float HEATER_MAX_C = 80.0f;
 
 static void controlLoop() {
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) { s_heating = false; return; }
     float air    = s_link.telemetry.airTempC[0];
-    float target = (float)menu.target_temp;
+    float target = s_targetC;
     float hyst   = (float)menu.hysteresis;
     if (air < target - hyst)  s_heating = true;
     else if (air >= target)   s_heating = false;
@@ -304,6 +410,20 @@ static void applyFan() {
     s_link.telemetry.fanOn[0] = s_heating;
 }
 
+// ← 章7：カードのアクション
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
@@ -311,26 +431,34 @@ void setup() {
     myHeater.begin();              // ← 章7
     myFan.begin();                 // ← 章7
     menu.initDefaults();
+    menu.loadFromNVS();
+    menu_sync_state_to_cache();
     s_link.begin();
+    // ポータルで紐付けが解除された：シークレットを消去し、新しいペアリングを待つ
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
 
-    s_link.onCommand("invoke", [](JsonObjectConst data) {   // ← 章7
-        const char* action = data["action"] | "";
-        if (strcmp(action, "storage.start") == 0) {
-            s_heating = true;
-            s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-            s_link.status.targetTempC[0] = (float)menu.target_temp;
-            s_link.publishStatusNow();
-        } else if (strcmp(action, "storage.stop") == 0) {
-            s_heating = false;
-            myHeater.off();
-            s_link.status.mode[0] = iDryer::UnitMode::Idle;
-            s_link.publishStatusNow();
-        }
-    });
+    auto& card = s_link.card();                          // ← 章7
+    idryer::card_menu::attach(card);
+    card.action("storage", "STORAGE", onStorage)
+        .name("ru", "Хранение").name("en", "Storage")
+        .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+    card.action("stop", "IDLE", onStop)
+        .name("ru", "Стоп").name("en", "Stop");
 }
 
 void loop() {
     s_link.loop();
+
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -352,11 +480,11 @@ void loop() {
 
 このステップの後：
 
-- ポータルから開始がストレージモードにシャフトを移動し、デバイスが暖め始めます；
+- デバイスカードの `保管` ボタンで、入力した温度でキャビネットが Storage モードになり、デバイスが加熱を始める；
 - 空気温度がターゲットに上昇し、ヒステリシス内で保たれます；
 - 加熱器は`HEATER_MAX_C`より上に行きません；
 - ファンと加熱電力がテレメトリーに表示されます；
-- ポータルからの停止がヒートをオフにし、アイドルに移動します。
+- `停止` ボタンで加熱が止まり Idle になる。次に起動するまでキャビネットは加熱しない。
 
 ## 次のステップ
 

@@ -1,6 +1,6 @@
 ---
 title: "Gerätemenü aus YAML: Einstellungen in NVS und auf dem Portal"
-description: "Wie man ein Gerätemenü auf idryer-core in menu.yaml beschreibt: Zieltemperatur und Hysterese werden in NVS gespeichert und durch Widgets auf dem iDryer-Portal angezeigt."
+description: "Wie man ein Gerätemenü auf idryer-core in menu.yaml beschreibt: Zieltemperatur und Hysterese werden in NVS gespeichert und im Gerätemenü auf dem iDryer-Portal angezeigt."
 ---
 
 # Menü aus YAML
@@ -14,7 +14,7 @@ Dies ist einer der Schlüsselbausteine des Kerns. Sie schreiben keinen Code zur 
 Nach den vorherigen Schritten liest das Gerät Sensoren, aber alle Schwellwerte sind im Code hartcodiert. Das Menü löst drei Aufgaben gleichzeitig:
 
 - **Speicherung**: Werte überstehen einen Neustart (NVS);
-- **Fernverwaltung vom Portal**: jeder Parameter wird zu einem Widget (Schieberegler, Schalter);
+- **Fernverwaltung vom Portal**: das Portal zeigt jeden Menüpunkt nach seinem Typ (Zahl, Schalter);
 - **Single Source of Truth**: eine Datei beschreibt Speicher und Schnittstelle.
 
 ## Wie es funktioniert
@@ -25,7 +25,7 @@ Eine Datei `menu.yaml` wird während des Builds durch einen Generator verarbeite
 menu.yaml → (pio run build) → C++-Dateien in src/menu/ + NVS + JSON für Portal
 ```
 
-Ein Punkt mit dem Feld `role:` ist für das Portal sichtbar und wird als Widget angezeigt. Ein Punkt ohne `role:` ist privat, nur für die interne Gerätelogik.
+Das Portal zeichnet jeden Menüpunkt nach seinem Typ. `role:` gibt einem Punkt eine übersetzte Beschriftung aus dem Kernvertrag; ein Punkt ohne `role:` erscheint mit seinem `title`.
 
 !!! warning "Bearbeiten Sie nicht die generierten Dateien"
     Die Dateien `menu_state.*`, `menu_bindings.*`, `menu_ids.h` und andere werden vom Generator erstellt. Bearbeiten Sie nur `menu.yaml` und bauen Sie neu auf – andernfalls werden Ihre Änderungen überschrieben.
@@ -78,7 +78,7 @@ Zieltemperatur für die Lagerung:
 ```yaml
 - id: target_temp
   type: value
-  role: storage.target_temperature   # macht den Parameter zu einem Widget auf dem Portal
+  role: storage.target_temperature   # Beschriftung aus dem Kernvertrag
   title: { ru: "ТЕМПЕРАТУРА", en: "TARGET TEMP" }
   unit:  { ru: "°C", en: "°C" }
   vtype: uint16
@@ -109,12 +109,12 @@ Hysterese (um wie viele Grad die Temperatur unter dem Sollwert abfallen kann, be
 ```
 
 !!! note "role: – eine abgeschlossene Liste"
-    Der Wert `role:` kann nicht willkürlich erfunden werden – er muss aus der Liste `canonical_roles` des Kernvertrags stammen. Wenn keine passende Rolle existiert, stoppt der Build und zeigt die zulässigen Optionen an. Für einen Lagerungsschrank sind die Rollen der Familie `storage.*` geeignet: `storage.target_temperature`, `storage.target_humidity`, `storage.start`, `storage.stop`. Die vollständige Liste steht in der Kopfzeile von `menu.template.yaml`. Parameter ohne `role:` (wie Hysterese oben) funktionieren als interne Einstellungen: Sie werden in NVS gespeichert, aber nicht an das Portal übermittelt.
+    Der Wert `role:` kann nicht willkürlich erfunden werden – er muss aus der Liste `canonical_roles` des Kernvertrags stammen. Wenn keine passende Rolle existiert, stoppt der Build und zeigt die zulässigen Optionen an. Für einen Lagerungsschrank sind die Rollen der Familie `storage.*` geeignet: `storage.target_temperature`, `storage.target_humidity`, `storage.start`, `storage.stop`. Die vollständige Liste steht in der Kopfzeile von `menu.template.yaml`. `role:` ist optional: ein Parameter ohne sie (wie die Hysterese oben) wird genauso gespeichert und veröffentlicht, nur die Beschriftung kommt aus `title`.
 
 Einschränkungen, die nicht verletzt werden dürfen:
 
 - `bind` – nicht länger als 15 Zeichen (NVS-Schlüssellimit);
-- fügen Sie kein Feld `widget:` in `menu.yaml` ein – der Widget-Typ wird durch den Vertrag nach `role:` bestimmt.
+- fügen Sie kein Feld `widget:` in `menu.yaml` ein — Portal und App lesen es nicht: ein Menüpunkt wird nach seinem Typ gezeichnet.
 
 !!! warning "Überprüfen Sie den Punkt ignore_external_cmd aus der Vorlage"
     In der Vorlage gibt es einen Punkt `ignore_external_cmd`, und sein `bind` beträgt 19 Zeichen, was das Limit von 15 überschreitet. Wenn Sie es so lassen, schlägt die Generierung fehl: `bind 'ignore_external_cmd' ... hat 19 Zeichen, Limit 15`. Entweder löschen Sie diesen Punkt oder verkürzen Sie `bind` auf `ign_ext_cmd` (wie in echten Produkten). Für einen Basis-Schrank können Sie ihn einfach löschen.
@@ -140,33 +140,91 @@ src/menu/
 
 Wenn der Build mit einer Nachricht über eine unbekannte `role:` fehlschlägt – bedeutet das, dass die Rolle nicht aus der Liste `canonical_roles` stammt. Korrigieren Sie sie und bauen Sie neu auf. Bearbeiten Sie Dateien mit der Kennzeichnung autogen nicht von Hand.
 
-## Schritt 5. Verbinden Sie das Menü mit dem Hauptprogramm
+## Schritt 5. Menü beim Start laden
 
-Um den Menü-Code zu verwenden, verbinden Sie zwei Dinge in `src/main.cpp`:
+Binden Sie das generierte Menü in `src/main.cpp` ein und laden Sie es in `setup()` — **vor** `s_link.begin()`:
 
-1. Der Header des generierten Menüs:
+```cpp
+#include <menu_state.h>      // Menü-Objekt mit allen Parametern
+#include <menu_bindings.h>   // menu_sync_state_to_cache, menu_apply_by_bind
 
-    ```cpp
-    #include <menu_state.h>      // Menü-Objekt mit allen Parametern
-    ```
+menu.initDefaults();         // Standardwerte aus YAML setzen
+menu.loadFromNVS();          // gespeicherte Werte; beim ersten Start werden die Standardwerte gespeichert
+menu_sync_state_to_cache();  // Werte in den Cache, aus dem das veröffentlichte Menü gebaut wird
+```
 
-2. Das Laden der Defaults in `setup()` – **vor** `s_link.begin()`:
-
-    ```cpp
-    menu.initDefaults();         // Standardwerte aus YAML setzen
-    ```
-
-Danach sind die Parameter über das globale Objekt `menu` zugänglich:
+Danach sind die Parameter über das globale Objekt `menu` erreichbar:
 
 ```cpp
 uint16_t target = menu.target_temp;   // direkter Zugriff auf den Wert
 ```
 
-Sie verwenden diese Werte in der Heizlogik im nächsten Schritt. Wenn der Benutzer den Parameter im Portal ändert, wendet der Kern automatisch den neuen Wert an und speichert ihn in NVS.
+## Schritt 6. Das Menü im Portal: veröffentlichen und Änderungen annehmen
+
+Das Portal liest das Menü nicht selbst vom Gerät: die Firmware veröffentlicht es und übernimmt die Änderungen, die zurückkommen. Drei Teile:
+
+- **veröffentlichen** — `menu_buildFullJson()` aus dem Core baut das Menü-JSON aus `menu.yaml` und den aktuellen Werten; `devicePublisher()->publishConfigRaw()` sendet es ans Portal (MQTT-Topic `config`) und über das lokale Netz an die App;
+- **wann** — wenn das Gerät online geht und auf den Befehl `get_config`: das Portal sendet ihn, wenn Sie das Gerätemenü öffnen (Zahnrad auf der Karte);
+- **ändern** — das Portal sendet `set` mit der `id` des Punkts und dem neuen Wert `val`. `menu_apply_by_bind()` schreibt den Wert in `menu`, in den NVS und in den Cache, dann wird das Menü erneut veröffentlicht und das Portal zeigt den bestätigten Wert.
+
+Fügen Sie nach den Includes hinzu:
+
+```cpp
+#include <menu_commands.h>                   // menu_buildFullJson
+#include <local_access/device_publisher.h>   // publishConfigRaw
+
+static bool s_menuPending = false;   // Menü aus loop() veröffentlichen
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;              // Grenzen aus menu.yaml
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);     // menu + NVS + Cache
+        s_menuPending = true;                          // neuen Wert im Portal zeigen
+        return;
+    }
+}
+```
+
+In `setup()`, nach `s_link.begin()`:
+
+```cpp
+s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
+```
+
+In `loop()`, nach `s_link.loop()`:
+
+```cpp
+static bool s_wasOnline = false;
+const bool online = s_link.isOnline();
+if (online && !s_wasOnline) s_menuPending = true;   // gerade online gegangen
+s_wasOnline = online;
+if (s_menuPending) {
+    s_menuPending = false;
+    publishMenu();
+}
+```
+
+!!! note "Warum das Menü aus loop() veröffentlicht wird"
+    Befehls-Callbacks werden tief im Netzwerk-Handler aufgerufen. Das Menü-JSON dort zu bauen kostet viel Stack, deshalb setzt der Callback nur ein Flag und `loop()` veröffentlicht.
+
+`applySet()` begrenzt den Wert auf `min`/`max` des Punkts aus `menu.yaml`: einer eingehenden Zahl traut das Gerät nicht blind.
 
 ## Vollständiger `src/main.cpp` nach diesem Kapitel
 
-Im Vergleich zum vorherigen Kapitel wurden nur zwei Zeilen hinzugefügt (markiert mit `// ← Kapitel 6`): Menü-Include und `menu.initDefaults()`.
+Gegenüber dem vorigen Kapitel sind die mit `// ← Kapitel 6` markierten Zeilen hinzugekommen: Menü laden, veröffentlichen und Änderungen annehmen.
 
 ??? note "Was war – `src/main.cpp` nach Kapitel 5"
 
@@ -214,6 +272,8 @@ Im Vergleich zum vorherigen Kapitel wurden nur zwei Zeilen hinzugefügt (markier
         Wire.begin(8, 9);
         s_climateOk = s_climate.begin();
         s_link.begin();
+        // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -236,7 +296,10 @@ Im Vergleich zum vorherigen Kapitel wurden nur zwei Zeilen hinzugefügt (markier
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
-#include <menu_state.h>           // ← Kapitel 6
+#include <menu_state.h>                      // ← Kapitel 6: Parameter (menu.target_temp …)
+#include <menu_bindings.h>                   // ← Kapitel 6: menu_apply_by_bind
+#include <menu_commands.h>                   // ← Kapitel 6: menu_buildFullJson
+#include <local_access/device_publisher.h>   // ← Kapitel 6: publishConfigRaw
 
 static const iDryer::Config CFG = {
     .deviceType        = iDryer::DeviceType::Dryer,
@@ -271,16 +334,56 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← Kapitel 6: Menü im Portal
+static bool s_menuPending = false;
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);
     s_climateOk = s_climate.begin();
-    menu.initDefaults();           // ← Kapitel 6
+    menu.initDefaults();                     // ← Kapitel 6
+    menu.loadFromNVS();                      // ← Kapitel 6
+    menu_sync_state_to_cache();              // ← Kapitel 6
     s_link.begin();
+    // Gerät im Portal entkoppelt: Geheimnis löschen, auf neue Kopplung warten.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });   // ← Kapitel 6
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });           // ← Kapitel 6
 }
 
 void loop() {
     s_link.loop();
+
+    // ← Kapitel 6: Menü beim Online-Gehen und auf Anfrage veröffentlichen
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
@@ -298,9 +401,10 @@ void loop() {
 
 Nach der Firmware:
 
-- im Portal auf der Gerätekarte erscheint die Einstellung der Zieltemperatur;
-- Wertänderungen im Portal werden gespeichert und überstehen einen Neustart;
-- interne Parameter (Hysterese) sind im Code über `menu` zugänglich.
+- das Zahnrad auf der Gerätekarte öffnet die Geräteseite mit dem Menü: die Zieltemperatur (das Portal beschriftet sie nach ihrer Rolle — „Storage temperature“) und **HYSTERESIS**;
+- ändern Sie dort einen Wert — das Gerät übernimmt ihn, speichert ihn im NVS und veröffentlicht das Menü erneut, das Portal zeigt den bestätigten Wert;
+- nach einem Neustart veröffentlicht das Gerät die gespeicherten Werte;
+- interne Parameter (Hysterese) sind im Code über `menu` erreichbar.
 
 ## Was kommt als Nächstes
 

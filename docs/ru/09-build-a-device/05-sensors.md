@@ -33,9 +33,6 @@ description: "Чтение датчика климата SHT31 и термист
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — выводы вашей платы
     s_climateOk = s_climate.begin();  // сам находит адрес 0x44 или 0x45
     s_link.begin();
+    // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← глава 5  (SDA, SCL — выводы вашей платы)
     s_climateOk = s_climate.begin();  // ← глава 5
     s_link.begin();
+    // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {

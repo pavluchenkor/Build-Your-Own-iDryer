@@ -33,9 +33,6 @@ You do not need to write the SHT31 driver from scratch — a ready-made `Sht31Cl
 
     ```ini
     lib_deps =
-        file://path/to/idryer-core
-        bblanchon/ArduinoJson @ ^6.21.0
-        knolleary/PubSubClient
         robtillaart/SHT31 @ ^0.5.0
     ```
 
@@ -56,6 +53,8 @@ void setup() {
     Wire.begin(8, 9);                 // SDA, SCL — pins on your board
     s_climateOk = s_climate.begin();  // auto-finds address 0x44 or 0x45
     s_link.begin();
+    // The portal unlinked the device: erase the secret, wait for a new pairing.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
@@ -137,6 +136,8 @@ Below is the entire file. New lines relative to the previous chapter are marked 
     void setup() {
         Serial.begin(115200);
         s_link.begin();
+        // The portal unlinked the device: erase the secret, wait for a new pairing.
+        s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
     }
 
     void loop() {
@@ -190,6 +191,8 @@ void setup() {
     Wire.begin(8, 9);                 // ← chapter 5  (SDA, SCL — pins on your board)
     s_climateOk = s_climate.begin();  // ← chapter 5
     s_link.begin();
+    // The portal unlinked the device: erase the secret, wait for a new pairing.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
 }
 
 void loop() {
