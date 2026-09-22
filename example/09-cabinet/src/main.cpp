@@ -1,12 +1,14 @@
 // Нагреваемый шкаф хранения филамента на ESP32 + idryer-core.
 // Эталонный пример к главе 9. Собирается: pio run -e cabinet.
 #include <Wire.h>
-#include <ArduinoJson.h>
-#include <string.h>
 #include <math.h>
 #include <iDryer.h>
 #include "Sht31ClimateSensor.h"
-#include <menu_state.h>
+#include <menu_state.h>                      // параметры: menu.target_temp …
+#include <menu_bindings.h>                   // menu_apply_by_bind, menu_sync_state_to_cache
+#include <menu_commands.h>                   // menu_buildFullJson
+#include <local_access/device_publisher.h>   // publishConfigRaw
+#include <card/card_menu_bridge.h>           // параметры действий карточки из меню
 
 // ── Паспорт устройства (глава 4) ─────────────────────────────────────
 static const iDryer::Config CFG = {
@@ -58,11 +60,14 @@ static GpioOutput myFan{5};      // GPIO5 — управление вентил�
 
 // ── Логика поддержания температуры (глава 7) ─────────────────────────
 static bool        s_heating    = false;
+static float       s_targetC    = 0.0f;    // цель текущего запуска (из карточки)
 static const float HEATER_MAX_C = 80.0f;   // потолок температуры нагревателя
 
 static void controlLoop() {
+    // Греем только в режиме хранения: после «Стоп» шкаф остывает.
+    if (s_link.status.mode[0] != iDryer::UnitMode::Storage) { s_heating = false; return; }
     float air    = s_link.telemetry.airTempC[0];   // SHT31
-    float target = (float)menu.target_temp;        // из меню
+    float target = s_targetC;                      // из карточки
     float hyst   = (float)menu.hysteresis;         // из меню
     if (air < target - hyst)  s_heating = true;    // остыли — греем
     else if (air >= target)   s_heating = false;   // дошли до цели — стоп
@@ -80,34 +85,90 @@ static void applyFan() {
     s_link.telemetry.fanOn[0] = s_heating;
 }
 
+// ── Меню на портале (глава 6) ────────────────────────────────────────
+// Портал сам меню не читает: прошивка публикует его при выходе в онлайн и
+// по команде get_config, а изменения приходят командой set.
+static bool s_menuPending = false;   // публиковать меню из loop()
+
+static void publishMenu() {
+    static char buf[MENU_FULL_JSON_BUF_SIZE];
+    const size_t len = menu_buildFullJson(buf, sizeof(buf));
+    if (len > 0) s_link.devicePublisher()->publishConfigRaw(buf, len);
+}
+
+// set {id, val}: значение в пределах пункта меню → menu, NVS и кэш; затем
+// меню публикуется заново, и портал показывает подтверждённое значение.
+static void applySet(JsonObjectConst data) {
+    const int id = data["id"] | -1;
+    float v = data["val"].is<bool>() ? (data["val"].as<bool>() ? 1.0f : 0.0f)
+                                     : data["val"].as<float>();
+    for (uint16_t i = 0; i < g_bindings_count; i++) {
+        if ((int)g_bindings[i].id != id) continue;
+        const MenuMeta& m = g_menu_meta[id];
+        if (v < m.min_val) v = m.min_val;
+        if (v > m.max_val) v = m.max_val;
+        menu_apply_by_bind(g_bindings[i].bind, v);
+        s_menuPending = true;
+        return;
+    }
+}
+
+// ── Действия карточки (глава 7) ──────────────────────────────────────
+// Запуск: температура приходит из карточки, SDK уже зажал её в пределы
+// пункта меню target_temp. В меню она не пишется.
+static void onStorage(uint8_t unit, JsonObjectConst args) {
+    s_targetC = args["temperature"].as<float>();
+    s_link.status.mode[unit]        = iDryer::UnitMode::Storage;
+    s_link.status.targetTempC[unit] = s_targetC;
+    s_link.publishStatusNow();
+}
+
+static void onStop(uint8_t unit, JsonObjectConst) {
+    s_link.status.mode[unit]        = iDryer::UnitMode::Idle;
+    s_link.status.targetTempC[unit] = 0.0f;
+    s_link.publishStatusNow();
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);                 // SDA, SCL — выводы вашей платы
     s_climateOk = s_climate.begin();  // сам находит адрес 0x44 или 0x45
     myHeater.begin();
     myFan.begin();
-    menu.initDefaults();              // дефолты меню в RAM
-    s_link.begin();
+    menu.initDefaults();              // дефолты из menu.yaml
+    menu.loadFromNVS();               // сохранённые значения; при первом старте сохраняются дефолты
+    menu_sync_state_to_cache();       // значения — в кэш: из него собирается меню и читает карточка
+    s_link.begin();                   // Wi-Fi и привязка — через приложение (глава 4)
 
-    // Команды портала. Реальное API фасада — onCommand (не onRequest).
-    s_link.onCommand("invoke", [](JsonObjectConst data) {
-        const char* action = data["action"] | "";
-        if (strcmp(action, "storage.start") == 0) {
-            s_heating = true;
-            s_link.status.mode[0]        = iDryer::UnitMode::Storage;
-            s_link.status.targetTempC[0] = (float)menu.target_temp;
-            s_link.publishStatusNow();
-        } else if (strcmp(action, "storage.stop") == 0) {
-            s_heating = false;
-            myHeater.off();
-            s_link.status.mode[0] = iDryer::UnitMode::Idle;
-            s_link.publishStatusNow();
-        }
-    });
+    // Устройство отвязали на портале: стереть секрет, ждать новой привязки.
+    s_link.onCommand("revoke", [](JsonObjectConst) { s_link.handleRevoke(); });
+    // Меню на портале (глава 6).
+    s_link.onCommand("get_config", [](JsonObjectConst) { s_menuPending = true; });
+    s_link.onCommand("set", [](JsonObjectConst data) { applySet(data); });
+
+    // Карточка: действие «Хранение» с температурой из меню и «Стоп».
+    auto& card = s_link.card();
+    idryer::card_menu::attach(card);
+    card.action("storage", "STORAGE", onStorage)
+        .name("ru", "Хранение").name("en", "Storage")
+        .param("temperature", "target_temperature", MENU_TARGET_TEMP);
+    card.action("stop", "IDLE", onStop)
+        .name("ru", "Стоп").name("en", "Stop");
 }
 
 void loop() {
     s_link.loop();   // сеть + автопубликация телеметрии/статуса
+
+    // Меню — при выходе в онлайн и по запросу. Не из колбэка команды: там
+    // сборка JSON стоит много стека.
+    static bool s_wasOnline = false;
+    const bool online = s_link.isOnline();
+    if (online && !s_wasOnline) s_menuPending = true;
+    s_wasOnline = online;
+    if (s_menuPending) {
+        s_menuPending = false;
+        publishMenu();
+    }
 
     if (s_climateOk) {
         s_climate.tick(millis());
