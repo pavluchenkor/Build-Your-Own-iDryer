@@ -4,6 +4,7 @@
 #include <math.h>
 #include <iDryer.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"                   // показания без датчиков (-DDEMO_SENSORS=1)
 #include <menu_state.h>                      // параметры: menu.target_temp …
 #include <menu_bindings.h>                   // menu_apply_by_bind, menu_sync_state_to_cache
 #include <menu_commands.h>                   // menu_buildFullJson
@@ -12,7 +13,7 @@
 
 // ── Паспорт устройства (глава 4) ─────────────────────────────────────
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // своё устройство: карточку собирает манифест
     .unitsCount        = 1,
     .hasHeater         = true,
     .hasFan            = true,
@@ -44,6 +45,24 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// ── Показания датчиков (глава 5) ─────────────────────────────────────
+// Настоящие датчики или, в сборке с -DDEMO_SENSORS=1, модель шкафа.
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 // ── Ключи нагревателя и вентилятора (глава 7) ────────────────────────
@@ -170,16 +189,7 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
-
+    readSensors();
     controlLoop();
     applyHeater();
     applyFan();
