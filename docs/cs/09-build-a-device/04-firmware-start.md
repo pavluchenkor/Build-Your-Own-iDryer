@@ -15,8 +15,10 @@ Budete potřebovat:
 
 - VS Code s rozšířením PlatformIO;
 - USB kabel;
-- Wi-Fi síť `2.4 GHz` (ESP32 nefunguje se sítěmi pouze `5 GHz`).
-- chytrý telefon s aplikací iDryer přihlášenou k vašemu účtu na portálu iDryer: přes ni zařízení dostane síť Wi-Fi a propojí se s účtem.
+- Wi-Fi síť `2.4 GHz` (ESP32 nefunguje se sítěmi pouze `5 GHz`);
+- chytrý telefon s aplikací iDryer ([App Store](https://apps.apple.com/app/idryer/id6760609044), [Google Play](https://play.google.com/store/apps/details?id=org.idryer.mobile)) přihlášenou k vašemu účtu na portálu iDryer: přes ni zařízení dostane síť Wi-Fi a propojí se s účtem;
+- knihovna jádra [idryer-core](https://github.com/pavluchenkor/idryer-core);
+- hotový projekt této kapitoly — [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet) v repozitáři učebnice: odtud se berou ovladač senzoru a další soubory, které se dále doporučuje zkopírovat.
 
 Co je firmware kontroléru a jak se dostane do desky — [Firmware kontroléru](../02-controllers/11-flashing-controller.md).
 
@@ -38,14 +40,21 @@ Všechny fragmenty kódu níže se umísťují právě do těchto souborů — v
 Knihovnu `idryer-core` vložte do `lib/` — PlatformIO tam automaticky hledá knihovny. Nejjednodušší je vytvořit symlink na staženou knihovnu:
 
 ```bash
-ln -s /cesta/k/idryer-core lib/idryer-core
+git clone https://github.com/pavluchenkor/idryer-core.git ~/idryer-core
+ln -s ~/idryer-core lib/idryer-core
 ```
+
+Místo symlinku můžete složku knihovny jednoduše zkopírovat do `lib/idryer-core` — funguje to stejně.
 
 To je také nutné pro generování menu (kapitola 6) — háček hledá generátor uvnitř `lib/idryer-core/`.
 
 ## 3. Wi-Fi a propojení nejsou v kódu
 
 Firmware neobsahuje heslo k síti ani údaje účtu. Při prvním spuštění zařízení nemá Wi-Fi a čeká na nastavení: aplikace iDryer je pošle vzduchem (ESPTouch) a potom zařízení propojí s vaším účtem jednorázovým párovacím tokenem. Jádro to vše dělá uvnitř `s_link.begin()` a `s_link.loop()`, vy jen projdete kroky v aplikaci — oddíl 9.
+
+**Jak se síť dostane do zařízení.** Deska bez uložené sítě poslouchá éter jako přijímač neladěný na stanici. Telefon mezitím „vyťukává" název sítě a heslo do vzduchu — přibližně jako morseovkou, jen pakety Wi-Fi. Deska tento přenos zachytí, připojí se k síti a dále do ní vstupuje sama při každém zapnutí. Zvláštní piny ani vodiče k tomu nejsou potřeba: pracuje standardní anténa desky, zapíná se to samo, dokud síť není, a trvá až 90 sekund.
+
+Pokud se to vzduchem nepodařilo, existuje drátová cesta: webový instalátor [install.idryer.org](https://install.idryer.org) předá desce síť a párovací token přes USB — totéž, co dělá aplikace, jen kabelem. Pomáhá i běžný restart desky: po něm znovu čeká na nastavení.
 
 ## 4. Nakonfigurujte platformio.ini
 
@@ -87,18 +96,10 @@ Pro vytápěnou skříň na začátek `src/main.cpp`
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // vlastní zařízení: kartu sestavuje manifest
     .unitsCount        = 1,
-    // Periférie:
-    .hasHeater         = true,    // řízený ohřívač
-    .hasFan            = true,    // ventilátor
-    .hasAirTemp        = true,    // teplota vzduchu (SHT31)
-    .hasAirHumidity    = true,    // vlhkost vzduchu (SHT31)
-    .hasHeaterTemp     = true,    // teplota ohřívače (termistor)
-    // Období autopublikace:
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
-    // Identifikace na portálu:
     .hardwareVersion   = "1.0",
     .firmwareVersion   = "0.1.0",
     .model             = "DIY Storage Cabinet",
@@ -139,13 +140,8 @@ Vezměte oba bloky výše do jednoho souboru — to je celý `src/main.cpp` v to
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // vlastní zařízení: kartu sestavuje manifest
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -189,7 +185,7 @@ Dokud zařízení nemá Wi-Fi, log mlčí: jádro drží sériový port pro webo
 [INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-Nechte monitor otevřený a přejděte do aplikace.
+Poslední řádek je přesně to, co je v tomto kroku potřeba: síť je, párovací tajný klíč není, zařízení čeká na token z aplikace. Nechte monitor otevřený a přejděte do aplikace.
 
 ## 9. Připojte Wi-Fi a propojte zařízení v aplikaci
 
@@ -200,6 +196,15 @@ Nechte monitor otevřený a přejděte do aplikace.
 5. Po zprávě **Zařízení spárováno** se zařízení objeví v seznamu zařízení na portálu i v aplikaci.
 
 Pokud už je zařízení v síti, otevřete rovnou krok **Spárování** — klepněte na jeho čip nahoře v okně.
+
+![Krok Wi-Fi v aplikaci: název sítě a heslo](../../img/09-cabinet/04-app-wifi.png)
+*Krok **Wi-Fi**: aplikace předává síť zařízení vzduchem.*
+
+![Krok spárování: aplikace našla zařízení v síti](../../img/09-cabinet/04-app-pairing.png)
+*Krok **Spárování**: aplikace našla zařízení v síti podle jeho sériového čísla. Cizí zařízení jsou označena jako obsazená.*
+
+![Zpráva „zařízení spárováno"](../../img/09-cabinet/04-app-paired.png)
+*Hotovo: zařízení je spárováno s účtem a za okamžik se objeví v seznamu.*
 
 V logu je propojení vidět:
 
@@ -213,11 +218,20 @@ V logu je propojení vidět:
 
 ## Ověření výsledku
 
-V této fázi by mělo být zařízení na portálu Online. Data ze senzorů zatím nejsou — to je v pořádku. Pokud se něco nepovedlo:
+V této fázi by mělo být zařízení na portálu Online. Data ze senzorů zatím nejsou — to je v pořádku: `Config` o nich zatím nic nedeklaroval a karta nemá co ukázat.
 
-- aplikace se nedočkala připojení zařízení k síti — zkontrolujte heslo a že síť je `2.4 GHz`; při špatném hesle zařízení znovu čeká na nastavení, zopakujte krok Wi-Fi;
+![Karta zařízení na portálu hned po spárování](../../img/09-cabinet/04-portal-card.png)
+*Zařízení na portálu: název, stav Idle, ikona spojení. Hodnoty nejsou — objeví se v další kapitole.*
+
+Název `Device DEVICE_…` je tovární. Přejmenujte zařízení tužkou vedle názvu: dále se v příkladech jmenuje „Storage cabinet".
+
+Pokud se něco nepovedlo:
+
+- aplikace se nedočkala připojení zařízení k síti — zkontrolujte heslo a že síť je `2.4 GHz`; při špatném hesle zařízení znovu čeká na nastavení, restartujte desku a zopakujte krok Wi-Fi;
+- síť se vzduchem stále nepředává — udělejte totéž přes USB pomocí webového instalátoru [install.idryer.org](https://install.idryer.org);
 - v kroku **Spárování** aplikace zařízení nenašla — telefon a zařízení musí být ve stejné síti a síť nesmí blokovat vyhledávání zařízení (hostovské sítě to často dělají);
 - zařízení se restartuje — zkontrolujte napájení ESP32 (poklesy napětí při startu jsou častou příčinou resetů);
+- sestavení padá s chybou — zeptejte se v komunitě: [Telegram](https://t.me/iDryer), [Discord](https://discord.gg/jGce5eeHHz);
 - viz [Chyby napájení](../08-common-mistakes/02-power-mistakes.md) a [Chyby řadiče](../08-common-mistakes/04-controller-mistakes.md).
 
 ## Co dál

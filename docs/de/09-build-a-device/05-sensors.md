@@ -19,7 +19,7 @@ Für unseren Schrank werden drei Felder verwendet (Index `[0]` — erste und ein
 | `s_link.telemetry.airHumidityPct[0]` | Luftfeuchte, % | `hasAirHumidity` |
 | `s_link.telemetry.heaterTempC[0]` | Heizer-Temperatur, °C | `hasHeaterTemp` |
 
-Alle drei Flags haben wir bereits im [Config aus dem vorherigen Schritt](04-firmware-start.md) aktiviert.
+Diese drei Flags werden genau hier in `Config` aktiviert (siehe das vollständige Listing am Ende des Kapitels). Das Flag teilt Portal und App mit, dass das Gerät einen solchen Sensor hat: ohne es erscheint die Zelle auf der Karte nicht.
 
 ## Regel: Sensoren-Code darf loop() nicht blockieren
 
@@ -27,7 +27,7 @@ Die `idryer-core` Fassade bedient Wi-Fi und MQTT in derselben `loop()`. Daher k�
 
 ## Schritt 1. SHT31: Schrank-Klima
 
-Es ist nicht nötig, den SHT31-Treiber von Grund auf zu schreiben — die fertige Klasse `Sht31ClimateSensor` gibt es im `iDryer-Storage`-Beispiel. Sie verwendet die `robtillaart/SHT31` Bibliothek und liest den Sensor blockierungsfrei.
+Es ist nicht nötig, den SHT31-Treiber von Grund auf zu schreiben — die fertige Klasse `Sht31ClimateSensor` liegt im Beispiel dieses Kapitels, [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet). Sie verwendet die `robtillaart/SHT31` Bibliothek und liest den Sensor blockierungsfrei.
 
 1. Fügen Sie die SHT31-Bibliothek in `lib_deps` Ihrer `platformio.ini` hinzu:
 
@@ -36,7 +36,12 @@ Es ist nicht nötig, den SHT31-Treiber von Grund auf zu schreiben — die fertig
         robtillaart/SHT31 @ ^0.5.0
     ```
 
-2. Kopieren Sie vier Dateien aus `iDryer-Storage/src/storage/sensors/` in Ihren `src/`-Ordner: `Sht31ClimateSensor.h`, `Sht31ClimateSensor.cpp`, `IClimateSensor.h` und `sensor_reading.h`.
+2. Kopieren Sie vier Treiber-Dateien in Ihren `src/`-Ordner:
+
+    ```bash
+    git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+    cp ~/byo-idryer/example/09-cabinet/src/{Sht31ClimateSensor.h,Sht31ClimateSensor.cpp,IClimateSensor.h,sensor_reading.h} src/
+    ```
 
 3. Verbinden Sie den Sensor über I2C (siehe [Schaltplan](03-wiring.md)) und lesen Sie ihn in `src/main.cpp`:
 
@@ -71,7 +76,20 @@ void loop() {
 }
 ```
 
-Die `SensorReading` Struktur (Felder `ok`, `temperature`, `humidity`) ist in `sensor_reading.h` deklariert. Nach dem Firmware-Upload werden Temperatur und Feuchte des Schranks auf dem Portal angezeigt — dies ist die erste Rückmeldung vom Gerät.
+Eine einzelne Messwertaufnahme gibt der Treiber als Struktur `SensorReading` aus `sensor_reading.h` zurück:
+
+```cpp
+struct SensorReading {
+    float    temperature = NAN;   // °C, NAN wenn es keinen Wert gibt
+    float    humidity    = NAN;   // % RH, NAN wenn es keinen Wert gibt
+    float    pressure    = NAN;   // hPa, für künftige Sensoren
+    uint32_t ts_ms       = 0;     // millis() zum Zeitpunkt des Lesens
+    bool     ok          = false; // true, wenn Temperatur und Feuchte gültig sind
+    int      err         = 0;     // Fehlercode, 0 — kein Fehler
+};
+```
+
+Nach dem Firmware-Upload werden Temperatur und Feuchte des Schranks auf dem Portal angezeigt — dies ist die erste Rückmeldung vom Gerät.
 
 ## Schritt 2. Thermistor: Heizer-Temperatur
 
@@ -91,7 +109,8 @@ static float readHeaterTempC() {
     int   raw = analogRead(THERM_PIN);          // 0..4095 auf ESP32
     float v   = (float)raw / 4095.0f;           // Bruchteil der Gesamtskala
     float r   = SERIES_R * (1.0f - v) / v;      // Thermistor-Widerstand, Ohm
-    // Steinhart-Hart-Gleichung (B-Parameter):
+    // Steinhart-Hart-Gleichung in der B-Parameter-Form — siehe Wikipedia:
+    // https://en.wikipedia.org/wiki/Steinhart%E2%80%93Hart_equation
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
 }
@@ -108,6 +127,37 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 
 Überprüfung des Thermistors mit einem Multimeter — [Thermistor überprüfen](../06-practical-guides/02-checking-thermistor.md).
 
+## Schritt 3. Keine Sensoren zur Hand? Demo-Modus
+
+Den Weg bis zur Karte können Sie auch ohne Hardware gehen: die Messwerte berechnet ein Modell des Schranks. Kopieren Sie die Datei `demo_sensors.h` aus demselben Beispiel:
+
+```bash
+cp ~/byo-idryer/example/09-cabinet/src/demo_sensors.h src/
+```
+
+und fügen Sie in `platformio.ini` das Build-Flag hinzu:
+
+```ini
+build_flags =
+    -DDEMO_SENSORS=1
+```
+
+Beide Zweige stecken hinter einer einzigen Funktion, und `loop()` weiß nicht, woher die Werte kommen:
+
+```cpp
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    // Auslesen von SHT31 und Thermistor — wie oben
+#endif
+}
+```
+
+Das Modell verhält sich wie ein echter Schrank: der Raum schwankt langsam um `24 °C`, ein eingeschalteter Heizer erwärmt die Luft, ein ausgeschalteter lässt sie abkühlen, beim Aufheizen sinkt die Feuchte. Die Heizleistung liest das Modell aus der Telemetrie, deshalb sieht die Logik aus dem Kapitel [Heizungssteuerung](07-heating-control.md) eine Reaktion und die Hysterese funktioniert. Die Screenshots in diesem Abschnitt sind genau so entstanden.
+
+Für ein Arbeitsgerät setzt man das Flag nicht: dann wird der Zweig mit den echten Sensoren gebaut.
+
 ## Vollständig `src/main.cpp` nach diesem Kapitel
 
 Unten ist die gesamte Datei. Neue Zeilen relativ zum letzten Kapitel sind mit `// ← Kapitel 5` gekennzeichnet; der Rest hat sich nicht geändert.
@@ -118,13 +168,8 @@ Unten ist die gesamte Datei. Neue Zeilen relativ zum letzten Kapitel sind mit `/
     #include <iDryer.h>
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // eigenes Gerät: die Karte baut das Manifest
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
-        .hasAirTemp        = true,
-        .hasAirHumidity    = true,
-        .hasHeaterTemp     = true,
         .telemetryPeriodMs = 5000,
         .statusPeriodMs    = 10000,
         .hardwareVersion   = "1.0",
@@ -150,15 +195,14 @@ Unten ist die gesamte Datei. Neue Zeilen relativ zum letzten Kapitel sind mit `/
 #include <Wire.h>                  // ← Kapitel 5
 #include <math.h>                  // ← Kapitel 5
 #include "Sht31ClimateSensor.h"    // ← Kapitel 5
+#include "demo_sensors.h"    // ← Kapitel 5: Messwerte ohne Sensoren (-DDEMO_SENSORS=1)
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // eigenes Gerät: die Karte baut das Manifest
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
+    .hasAirTemp        = true,     // ← Kapitel 5
+    .hasAirHumidity    = true,     // ← Kapitel 5
+    .hasHeaterTemp     = true,  // ← Kapitel 5
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -186,6 +230,23 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← Kapitel 5: Sensoren oder, mit -DDEMO_SENSORS=1, das Modell des Schranks
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);                 // ← Kapitel 5  (SDA, SCL — Pins Ihres Boards)
@@ -198,19 +259,14 @@ void setup() {
 void loop() {
     s_link.loop();
 
-    if (s_climateOk) {                                       // ← Kapitel 5
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();     // ← Kapitel 5
+    readSensors();   // ← Kapitel 5
 }
 ```
 
 ## Überprüfung des Ergebnisses
+
+![Geräteseite im Portal: Messwerte und Diagramm](../../img/09-cabinet/05-portal-device.png)
+*Messwerte auf der Karte und Telemetrie-Diagramm. Die Heizer-Temperatur läuft als eigene Linie im Diagramm. Das Menü unten auf der Seite ist noch leer — darum kümmert sich das nächste Kapitel.*
 
 Nach diesem Schritt sollten drei Werte auf dem Portal angezeigt werden:
 

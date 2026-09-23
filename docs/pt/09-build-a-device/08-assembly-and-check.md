@@ -18,7 +18,7 @@ Nesta página você monta o dispositivo na carcaça, realiza o primeiro aquecime
 Requisitos para a carcaça e colocação de componentes - [Projecto de carcaça](../07-3d-printing/05-enclosure-design.md).
 
 !!! warning "Peças impressas perto de calor"
-    PLA amolece numa temperatura que se encontra facilmente perto do aquecedor. Peças perto de calor imprima com material resistente ao calor. Veja [Materiais à prova de calor](../07-3d-printing/04-heat-resistant-materials.md) e [Por que PLA é arriscado](../07-3d-printing/06-why-pla-is-risky.md).
+    PLA amolece numa temperatura que se encontra facilmente perto do aquecedor. Peças perto de calor imprima com material resistente ao calor: ABS, ASA ou PA (nylon). Veja [Materiais à prova de calor](../07-3d-printing/04-heat-resistant-materials.md) e [Por que PLA é arriscado](../07-3d-printing/06-why-pla-is-risky.md).
 
 ## Verificação antes de fornecer alimentação
 
@@ -34,7 +34,7 @@ Como usar multímetro - [Multímetro](../05-tools/02-multimeter.md).
 
 ## Primeiro arranque
 
-1. Forneça alimentação apenas ao controlador e sensores (não ligue a carga por enquanto se possível).
+1. Forneça alimentação apenas ao controlador e sensores. Se a fonte de alimentação for uma só para tudo, alimente o controlador à parte: por USB ou através de um conversor step-down, e não ligue por enquanto o fio do aquecedor.
 2. Certifique-se de que o dispositivo está Online no portal e mostra temperatura e humidade.
 3. Ligue o aquecedor e a ventoinha.
 4. Arranque o modo de manutenção de calor do portal e observe.

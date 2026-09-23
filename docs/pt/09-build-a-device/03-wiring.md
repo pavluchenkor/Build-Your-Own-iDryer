@@ -8,7 +8,7 @@ description: "Mapa de pinos de ESP32 para armário caseiro: SHT31 por I2C, termi
 Nesta página está como conectar componentes ao redor de ESP32. Primeiro o mapa geral de pinos, depois a ligação de cada componente e as regras para o encaminhamento da parte de potência.
 
 !!! warning "Primeiro, verifique a pinagem da sua placa"
-    Os números de pinos abaixo são um exemplo. Diferentes placas ESP32-C3 e ESP32-S3 têm numeração e disposição de pinos diferentes. Antes da montagem, verifique a pinagem da sua placa específica. Nem todos os pinos podem ser usados livremente: alguns estão ocupados por carregamento, flash ou USB.
+    Os números de pinos abaixo são um exemplo. Diferentes placas ESP32-C3 e ESP32-S3 têm numeração e disposição de pinos diferentes. Antes da montagem, verifique a pinagem da sua placa de desenvolvimento específica: nas DevKit e Super Mini ela é publicada pelo fabricante e consta na descrição da placa. Nem todos os pinos podem ser usados livremente: alguns estão ocupados por carregamento, flash ou USB.
 
 ## Mapa de pinos (exemplo)
 

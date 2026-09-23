@@ -8,7 +8,7 @@ description: "Mapa de pines de ESP32 para armario hecho a sí mismo: SHT31 por I
 En esta página se explica cómo conectar los componentes alrededor del ESP32. Primero un mapa general de pines, luego la conexión de cada nodo y las reglas de enrutamiento de la parte de potencia.
 
 !!! warning "Primero verifique la distribución de pines de su placa"
-    Los números de pines que se muestran a continuación son un ejemplo. En diferentes placas ESP32-C3 y ESP32-S3, la numeración y distribución de pines son diferentes. Antes del montaje, consulte la distribución de pines de su placa específica. No todos los pines se pueden utilizar libremente: algunos están ocupados por el arranque, flash o USB.
+    Los números de pines que se muestran a continuación son un ejemplo. En diferentes placas ESP32-C3 y ESP32-S3, la numeración y distribución de pines son diferentes. Antes del montaje, consulte la distribución de pines de su placa de desarrollo específica: en las DevKit y Super Mini está publicada por el fabricante y figura en la descripción de la placa. No todos los pines se pueden utilizar libremente: algunos están ocupados por el arranque, flash o USB.
 
 ## Mapa de pines (ejemplo)
 

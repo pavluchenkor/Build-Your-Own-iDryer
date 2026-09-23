@@ -8,7 +8,7 @@ description: "Mapa de pinos ESP32 para gabinete caseiro: SHT31 em I2C, termistor
 Nesta página está como conectar os componentes ao redor do ESP32. Primeiro um mapa geral de pinos, depois a conexão de cada nó e regras de roteamento da parte de potência.
 
 !!! warning "Primeiro verifique o pinout da sua placa"
-    Os números de pino abaixo são um exemplo. Placas diferentes ESP32-C3 e ESP32-S3 têm numeração e localização de pinos diferentes. Antes de montar, verifique com o pinout específico da sua placa. Nem todos os pinos podem ser usados livremente: alguns estão ocupados por boot, flash ou USB.
+    Os números de pino abaixo são um exemplo. Placas diferentes ESP32-C3 e ESP32-S3 têm numeração e localização de pinos diferentes. Antes de montar, verifique com o pinout específico da sua placa de desenvolvimento: no DevKit e no Super Mini ele é publicado pelo fabricante e consta na descrição da placa. Nem todos os pinos podem ser usados livremente: alguns estão ocupados por boot, flash ou USB.
 
 ## Mapa de pinos (exemplo)
 

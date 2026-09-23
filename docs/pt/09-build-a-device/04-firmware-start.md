@@ -15,8 +15,10 @@ Você vai precisar de:
 
 - VS Code com extensão PlatformIO;
 - cabo USB;
-- rede Wi-Fi `2,4 GHz` (ESP32 não funciona com redes só `5 GHz`).
-- um smartphone com a aplicação iDryer, com sessão iniciada na sua conta do portal iDryer: é através dela que o dispositivo recebe a rede Wi-Fi e fica associado à conta.
+- rede Wi-Fi `2,4 GHz` (ESP32 não funciona com redes só `5 GHz`);
+- um smartphone com a aplicação iDryer ([App Store](https://apps.apple.com/app/idryer/id6760609044), [Google Play](https://play.google.com/store/apps/details?id=org.idryer.mobile)), com sessão iniciada na sua conta do portal iDryer: é através dela que o dispositivo recebe a rede Wi-Fi e fica associado à conta;
+- a biblioteca do núcleo [idryer-core](https://github.com/pavluchenkor/idryer-core);
+- o projecto pronto deste capítulo - [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet) no repositório do manual: é de lá que vêm o driver do sensor e outros ficheiros que mais à frente se propõe copiar.
 
 O que é firmware do controlador e como entra na placa - [Firmware do controlador](../02-controllers/11-flashing-controller.md).
 
@@ -38,14 +40,21 @@ Todos os fragmentos de código abaixo vão para estes ficheiros - cada passo esp
 Coloque a biblioteca `idryer-core` em `lib/` - PlatformIO encontra bibliotecas lá automaticamente. A maneira mais fácil é fazer um symlink para a biblioteca transferida:
 
 ```bash
-ln -s /caminho/para/idryer-core lib/idryer-core
+git clone https://github.com/pavluchenkor/idryer-core.git ~/idryer-core
+ln -s ~/idryer-core lib/idryer-core
 ```
+
+Em vez do symlink pode simplesmente copiar a pasta da biblioteca para `lib/idryer-core` - funciona da mesma maneira.
 
 Isto também é necessário para gerar menu (capítulo 6) - o hook procura o gerador dentro de `lib/idryer-core/`.
 
 ## 3. O Wi-Fi e a associação não estão no código
 
 O firmware não contém a palavra-passe da rede nem dados da conta. No primeiro arranque o dispositivo não tem Wi-Fi e espera pela configuração: a aplicação iDryer envia-a pelo ar (ESPTouch) e depois associa o dispositivo à sua conta com um token de associação de uso único. O core faz tudo isto dentro de `s_link.begin()` e `s_link.loop()`; a si só lhe resta seguir os passos na aplicação — secção 9.
+
+**Como a rede chega ao dispositivo.** Uma placa sem rede guardada escuta o éter, como um receptor que ainda não foi sintonizado numa estação. O telemóvel, entretanto, «bate» o nome da rede e a palavra-passe no ar — mais ou menos como em código Morse, só que com pacotes Wi-Fi. A placa apanha essa transmissão, liga-se à rede e depois entra nela sozinha a cada arranque. Não são precisos pinos nem fios à parte para isto: funciona a antena própria da placa, arranca sozinho enquanto não houver rede e dura até 90 segundos.
+
+Se pelo ar não resultar, há um caminho por cabo: o instalador web [install.idryer.org](https://install.idryer.org) entrega à placa a rede e o token de associação por USB — o mesmo que faz a aplicação, só que por cabo. Também ajuda um simples reinício da placa: depois dele volta a esperar pela configuração.
 
 ## 4. Configure platformio.ini
 
@@ -87,18 +96,10 @@ Para o armário aquecido no início de `src/main.cpp`
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // dispositivo próprio: o cartão é construído pelo manifesto
     .unitsCount        = 1,
-    // Periféricos:
-    .hasHeater         = true,    // aquecedor controlado
-    .hasFan            = true,    // ventoinha
-    .hasAirTemp        = true,    // temperatura do ar (SHT31)
-    .hasAirHumidity    = true,    // humidade do ar (SHT31)
-    .hasHeaterTemp     = true,    // temperatura do aquecedor (termistor)
-    // Períodos de autopublicação:
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
-    // Identificação no portal:
     .hardwareVersion   = "1.0",
     .firmwareVersion   = "0.1.0",
     .model             = "DIY Storage Cabinet",
@@ -139,13 +140,8 @@ Pegue nos dois blocos acima num ficheiro - este é todo o `src/main.cpp` neste p
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // dispositivo próprio: o cartão é construído pelo manifesto
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -189,7 +185,7 @@ Enquanto o dispositivo não tem Wi-Fi, o log está em silêncio: o core reserva 
 [INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-Deixe o monitor aberto e passe para a aplicação.
+A última linha é o que se pretende neste passo: há rede, não há segredo de associação, o dispositivo espera o token da aplicação. Deixe o monitor aberto e passe para a aplicação.
 
 ## 9. Ligue o Wi-Fi e associe o dispositivo na aplicação
 
@@ -200,6 +196,15 @@ Deixe o monitor aberto e passe para a aplicação.
 5. Depois de **Dispositivo emparelhado**, o dispositivo aparece na lista de dispositivos do portal e da aplicação.
 
 Se o dispositivo já estiver na rede, abra logo o passo **Vinculação** — toque no respetivo chip no topo da janela.
+
+![Passo Wi-Fi na aplicação: nome da rede e palavra-passe](../../img/09-cabinet/04-app-wifi.png)
+*Passo **Wi-Fi**: a aplicação entrega a rede ao dispositivo pelo ar.*
+
+![Passo de vinculação: a aplicação encontrou o dispositivo na rede](../../img/09-cabinet/04-app-pairing.png)
+*Passo **Vinculação**: a aplicação encontrou o dispositivo na rede pelo seu número de série. Os dispositivos alheios estão marcados como ocupados.*
+
+![Mensagem «dispositivo emparelhado»](../../img/09-cabinet/04-app-paired.png)
+*Pronto: o dispositivo está associado à conta e vai já aparecer na lista.*
 
 O log mostra a associação:
 
@@ -213,11 +218,20 @@ O log mostra a associação:
 
 ## Verificação de resultado
 
-Nesta fase o dispositivo deve estar Online no portal. Ainda não há dados de sensores — é o esperado. Se algo correu mal:
+Nesta fase o dispositivo deve estar Online no portal. Ainda não há dados de sensores — é o esperado: o `Config` ainda não declarou nada sobre eles e o cartão não tem o que mostrar.
 
-- a aplicação não viu o dispositivo entrar na rede — verifique a palavra-passe e se a rede é de `2.4 GHz`; com a palavra-passe errada o dispositivo volta a esperar pela configuração, repita o passo Wi-Fi;
+![Cartão do dispositivo no portal logo após a vinculação](../../img/09-cabinet/04-portal-card.png)
+*O dispositivo no portal: nome, estado Idle, ícone de ligação. Não há leituras — aparecem no capítulo seguinte.*
+
+O nome `Device DEVICE_…` é de fábrica. Mude o nome do dispositivo com o lápis ao lado do nome: mais à frente nos exemplos chama-se «Storage cabinet».
+
+Se algo correu mal:
+
+- a aplicação não viu o dispositivo entrar na rede — verifique a palavra-passe e se a rede é de `2.4 GHz`; com a palavra-passe errada o dispositivo volta a esperar pela configuração, reinicie a placa e repita o passo Wi-Fi;
+- a rede continua a não passar pelo ar — faça o mesmo por USB através do instalador web [install.idryer.org](https://install.idryer.org);
 - no passo **Vinculação** a aplicação não encontrou o dispositivo — o telemóvel e o dispositivo têm de estar na mesma rede, e a rede não pode bloquear a descoberta de dispositivos (as redes de convidados costumam bloquear);
 - o dispositivo reinicia — verifique a alimentação do ESP32 (quedas de tensão no arranque são uma causa frequente de reinícios);
+- a compilação falha com erro — pergunte na comunidade: [Telegram](https://t.me/iDryer), [Discord](https://discord.gg/jGce5eeHHz);
 - ver [Erros de alimentação](../08-common-mistakes/02-power-mistakes.md) e [Erros do controlador](../08-common-mistakes/04-controller-mistakes.md).
 
 ## O que vem a seguir

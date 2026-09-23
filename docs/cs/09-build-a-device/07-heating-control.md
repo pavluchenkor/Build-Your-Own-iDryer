@@ -138,6 +138,12 @@ Pole telemetrie (`heaterPower01`, `fanOn`) fasáda publikuje sama — na portál
 
 Spuštění a zastavení přicházejí z karty zařízení na portálu a v aplikaci. Firmware je deklaruje jako **akce** karty: jádro je přidá do card manifestu a portál i aplikace samy nakreslí formulář a tlačítka. Příkazy v kódu nerozebíráte — jádro zavolá vaši funkci.
 
+![Karta s formulářem spuštění](../../img/09-cabinet/07-portal-card.png)
+*Karta je sestavena z manifestu: vlevo hodnoty včetně výkonu ohřevu a ventilátoru, vpravo formulář s teplotou a tlačítkem spuštění. Portál o tomto zařízení nic nevěděl — všechno přišlo z firmwaru.*
+
+![Táž karta v aplikaci](../../img/09-cabinet/07-app-card.png)
+*V aplikaci je totéž a ze stejného manifestu: hodnoty, pole teploty a tlačítko spuštění.*
+
 Meze pole teploty a výchozí hodnota se berou z položky menu `target_temp` (30–50 °C, 45) přes most `card_menu_bridge.h`. Hodnota, kterou uživatel zadá, odchází s příkazem ke spuštění a do menu se nezapisuje. Přidejte hlavičku vedle hlaviček menu z kapitoly 6:
 
 ```cpp
@@ -206,16 +212,15 @@ Toto je finální, hotový soubor zařízení. Nové řádky oproti předchozí 
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // hodnoty bez senzorů (-DDEMO_SENSORS=1)
     #include <menu_state.h>                      // ← kapitola 6: parametry (menu.target_temp …)
     #include <menu_bindings.h>                   // ← kapitola 6: menu_apply_by_bind
     #include <menu_commands.h>                   // ← kapitola 6: menu_buildFullJson
     #include <local_access/device_publisher.h>   // ← kapitola 6: publishConfigRaw
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // vlastní zařízení: kartu sestavuje manifest
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -242,6 +247,23 @@ Toto je finální, hotový soubor zařízení. Nové řádky oproti předchozí 
         float r   = SERIES_R * (1.0f - v) / v;
         float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
         return tK - 273.15f;
+    }
+
+    // Hodnoty: senzory nebo, s -DDEMO_SENSORS=1, model skříně
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
     }
 
     // ← kapitola 6: menu na portálu
@@ -295,15 +317,7 @@ Toto je finální, hotový soubor zařízení. Nové řádky oproti předchozí 
             publishMenu();
         }
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -312,6 +326,7 @@ Toto je finální, hotový soubor zařízení. Nové řádky oproti předchozí 
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // hodnoty bez senzorů (-DDEMO_SENSORS=1)
 #include <menu_state.h>
 #include <menu_bindings.h>
 #include <menu_commands.h>
@@ -319,10 +334,10 @@ Toto je finální, hotový soubor zařízení. Nové řádky oproti předchozí 
 #include <card/card_menu_bridge.h>        // ← kapitola 7
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // vlastní zařízení: kartu sestavuje manifest
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
+    .hasHeater         = true,     // ← kapitola 7
+    .hasFan            = true,        // ← kapitola 7
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -349,6 +364,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// Hodnoty: senzory nebo, s -DDEMO_SENSORS=1, model skříně
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 static bool s_menuPending = false;
@@ -460,15 +492,7 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 
     controlLoop();   // ← kapitola 7
     applyHeater();   // ← kapitola 7
@@ -477,6 +501,18 @@ void loop() {
 ```
 
 ## Kontrola výsledku
+
+![Karta hned po spuštění uložení](../../img/09-cabinet/07-portal-session.png)
+*Hned po spuštění: režim Storage, cíl 45 °C, výkon 100 %, ventilátor zapnutý, běží odpočet času.*
+
+![Karta a graf po třech minutách ohřevu](../../img/09-cabinet/07-portal-heating.png)
+*Po třech minutách: vzduch ve skříni se ohřál, vlhkost klesla, ohřívač dosáhl pracovní teploty. Na grafu je vidět, jak se výkon zapíná a vypíná podle hystereze.*
+
+![Spuštění uložení z aplikace](../../img/09-cabinet/07-app-session.png)
+*Uložení lze spustit i z aplikace: objeví se tlačítko „Zastavit" a odpočet času.*
+
+![Ohřev v aplikaci po třech minutách](../../img/09-cabinet/07-app-heating.png)
+*Po třech minutách v aplikaci: 43,9 ze 45 °C, vlhkost klesla z 51 na 33 %. Na grafu teplota stoupá, vlhkost klesá.*
 
 Po tomto kroku:
 

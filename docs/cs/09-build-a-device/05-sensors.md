@@ -19,7 +19,7 @@ Pro naši skříň se používají tři pole (index `[0]` — první a jediná k
 | `s_link.telemetry.airHumidityPct[0]` | vlhkost vzduchu, % | `hasAirHumidity` |
 | `s_link.telemetry.heaterTempC[0]` | teplota ohřívače, °C | `hasHeaterTemp` |
 
-Všechny tři příznaky jsme již aktivovali v [Config v předchozím kroku](04-firmware-start.md).
+Tyto tři příznaky se zapínají právě zde, v `Config` (viz úplný výpis na konci kapitoly). Příznak říká portálu a aplikaci, že zařízení takový senzor má: bez něj se buňka na kartě neobjeví.
 
 ## Pravidlo: kód senzoru nesmí blokovat loop()
 
@@ -27,7 +27,7 @@ Fasáda `idryer-core` obsluhuje Wi-Fi a MQTT ve stejném `loop()`. Proto při č
 
 ## Krok 1. SHT31: klima skříně
 
-Psát ovladač SHT31 od nuly není potřebné — gotová třída `Sht31ClimateSensor` je k dispozici v příkladu `iDryer-Storage`. Používá knihovnu `robtillaart/SHT31` a čte senzor bez blokování.
+Psát ovladač SHT31 od nuly není potřebné — gotová třída `Sht31ClimateSensor` leží v příkladu této kapitoly, [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet). Používá knihovnu `robtillaart/SHT31` a čte senzor bez blokování.
 
 1. Přidejte knihovnu SHT31 do `lib_deps` svého `platformio.ini`:
 
@@ -36,7 +36,12 @@ Psát ovladač SHT31 od nuly není potřebné — gotová třída `Sht31ClimateS
         robtillaart/SHT31 @ ^0.5.0
     ```
 
-2. Zkopírujte čtyři soubory z `iDryer-Storage/src/storage/sensors/` do své složky `src/`: `Sht31ClimateSensor.h`, `Sht31ClimateSensor.cpp`, `IClimateSensor.h` a `sensor_reading.h`.
+2. Zkopírujte do své složky `src/` čtyři soubory ovladače:
+
+    ```bash
+    git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+    cp ~/byo-idryer/example/09-cabinet/src/{Sht31ClimateSensor.h,Sht31ClimateSensor.cpp,IClimateSensor.h,sensor_reading.h} src/
+    ```
 
 3. Připojte senzor přes I2C (viz [Schéma zapojení](03-wiring.md)) a přečtěte jej v `src/main.cpp`:
 
@@ -71,7 +76,20 @@ void loop() {
 }
 ```
 
-Struktura `SensorReading` (pole `ok`, `temperature`, `humidity`) je deklarována v `sensor_reading.h`. Po nahrání do zařízení se na portálu objeví teplota a vlhkost skříně — toto je první zpětná vazba ze zařízení.
+Jeden snímek hodnot vrací ovladač strukturou `SensorReading` ze `sensor_reading.h`:
+
+```cpp
+struct SensorReading {
+    float    temperature = NAN;   // °C, NAN pokud není hodnota
+    float    humidity    = NAN;   // % RH, NAN pokud není hodnota
+    float    pressure    = NAN;   // hPa, pro budoucí senzory
+    uint32_t ts_ms       = 0;     // millis() v okamžiku čtení
+    bool     ok          = false; // true, pokud jsou teplota i vlhkost platné
+    int      err         = 0;     // kód chyby, 0 — bez chyby
+};
+```
+
+Po nahrání do zařízení se na portálu objeví teplota a vlhkost skříně — toto je první zpětná vazba ze zařízení.
 
 ## Krok 2. Termistor: teplota ohřívače
 
@@ -91,7 +109,8 @@ static float readHeaterTempC() {
     int   raw = analogRead(THERM_PIN);          // 0..4095 na ESP32
     float v   = (float)raw / 4095.0f;           // podíl z plné stupnice
     float r   = SERIES_R * (1.0f - v) / v;      // odpor termistoru, Ω
-    // Steinhart-Hartova rovnice (B-parametr):
+    // Steinhart-Hartova rovnice ve tvaru B-parametru — viz Wikipedii:
+    // https://en.wikipedia.org/wiki/Steinhart%E2%80%93Hart_equation
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
 }
@@ -108,6 +127,37 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 
 Ověření termistoru multimetrem — [Ověření termistoru](../06-practical-guides/02-checking-thermistor.md).
 
+## Krok 3. Nemáte senzory po ruce? Demo režim
+
+Projít cestu až ke kartě lze i bez železa: hodnoty spočítá model skříně. Zkopírujte soubor `demo_sensors.h` ze stejného příkladu:
+
+```bash
+cp ~/byo-idryer/example/09-cabinet/src/demo_sensors.h src/
+```
+
+a přidejte do `platformio.ini` příznak sestavení:
+
+```ini
+build_flags =
+    -DDEMO_SENSORS=1
+```
+
+Obě větve jsou schované za jednou funkcí a `loop()` neví, odkud hodnoty přišly:
+
+```cpp
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    // čtení SHT31 a termistoru — jako výše
+#endif
+}
+```
+
+Model se chová jako skutečná skříň: místnost pomalu kolísá kolem `24 °C`, zapnutý ohřívač vzduch ohřívá, vypnutý jej nechá vychladnout, při ohřevu klesá vlhkost. Výkon ohřevu model čte z telemetrie, takže logika z kapitoly [Řízení ohřevu](07-heating-control.md) vidí odezvu a hystereze funguje. Snímky obrazovky v této části vznikly právě takto.
+
+Pro provozní zařízení se příznak nenastavuje: pak se sestaví větev se skutečnými senzory.
+
 ## Úplný `src/main.cpp` po této kapitole
 
 Níže je celý soubor dohromady. Nové řádky ve srovnání s předchozí kapitolou jsou označeny `// ← kapitola 5`; zbytek se nezměnil.
@@ -118,13 +168,8 @@ Níže je celý soubor dohromady. Nové řádky ve srovnání s předchozí kapi
     #include <iDryer.h>
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // vlastní zařízení: kartu sestavuje manifest
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
-        .hasAirTemp        = true,
-        .hasAirHumidity    = true,
-        .hasHeaterTemp     = true,
         .telemetryPeriodMs = 5000,
         .statusPeriodMs    = 10000,
         .hardwareVersion   = "1.0",
@@ -150,15 +195,14 @@ Níže je celý soubor dohromady. Nové řádky ve srovnání s předchozí kapi
 #include <Wire.h>                  // ← kapitola 5
 #include <math.h>                  // ← kapitola 5
 #include "Sht31ClimateSensor.h"    // ← kapitola 5
+#include "demo_sensors.h"    // ← kapitola 5: hodnoty bez senzorů (-DDEMO_SENSORS=1)
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // vlastní zařízení: kartu sestavuje manifest
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
+    .hasAirTemp        = true,     // ← kapitola 5
+    .hasAirHumidity    = true,     // ← kapitola 5
+    .hasHeaterTemp     = true,  // ← kapitola 5
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -186,6 +230,23 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← kapitola 5: senzory nebo, s -DDEMO_SENSORS=1, model skříně
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);                 // ← kapitola 5  (SDA, SCL — vývody vaší desky)
@@ -198,19 +259,14 @@ void setup() {
 void loop() {
     s_link.loop();
 
-    if (s_climateOk) {                                       // ← kapitola 5
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();     // ← kapitola 5
+    readSensors();   // ← kapitola 5
 }
 ```
 
 ## Ověření výsledku
+
+![Stránka zařízení na portálu: hodnoty a graf](../../img/09-cabinet/05-portal-device.png)
+*Hodnoty na kartě a graf telemetrie. Teplota ohřívače jde na grafu samostatnou čarou. Menu dole na stránce je zatím prázdné — tím se zabývá další kapitola.*
 
 Po tomto kroku by se na portálu měly zobrazovat tři hodnoty:
 

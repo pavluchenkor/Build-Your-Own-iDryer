@@ -8,7 +8,7 @@ description: "Mapování pinů ESP32 pro domácí skříň: SHT31 přes I2C, ter
 Na této stránce — jak připojit součástky kolem ESP32. Nejdříve obecná mapování pinů, poté připojení jednotlivých uzlů a pravidla vedení silnoproudé části.
 
 !!! warning "Nejdříve zkontrolujte pinout vaší desky"
-    Čísla pinů níže — příklad. Různé desky ESP32-C3 a ESP32-S3 mají různé číslování a rozmístění pinů. Před montáží zkontrolujte pinout přesně vaší desky. Ne všechny piny lze používat volně: některé jsou obsazeny bootloadem, flash nebo USB.
+    Čísla pinů níže — příklad. Různé desky ESP32-C3 a ESP32-S3 mají různé číslování a rozmístění pinů. Před montáží zkontrolujte pinout přesně vaší vývojové desky: u DevKit a Super Mini jej zveřejňuje výrobce a najdete jej v popisu desky. Ne všechny piny lze používat volně: některé jsou obsazeny bootloadem, flash nebo USB.
 
 ## Mapování pinů (příklad)
 

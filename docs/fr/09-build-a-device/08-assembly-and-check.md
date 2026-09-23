@@ -18,7 +18,7 @@ Sur cette page, vous assemblez le dispositif dans un boîtier, effectuez un prem
 Les exigences relatives au boîtier et à la disposition des assemblages — [Conception du boîtier](../07-3d-printing/05-enclosure-design.md).
 
 !!! warning "Pièces imprimées à proximité de la chaleur"
-    Le PLA se ramollit à une température qui se trouve facilement près du radiateur. Imprimez les pièces près de la chaleur à partir d'un matériau résistant à la chaleur. Voir [Matériaux résistants à la chaleur](../07-3d-printing/04-heat-resistant-materials.md) et [Pourquoi le PLA est un choix risqué](../07-3d-printing/06-why-pla-is-risky.md).
+    Le PLA se ramollit à une température qui se trouve facilement près du radiateur. Imprimez les pièces près de la chaleur à partir d'un matériau résistant à la chaleur : ABS, ASA ou PA (nylon). Voir [Matériaux résistants à la chaleur](../07-3d-printing/04-heat-resistant-materials.md) et [Pourquoi le PLA est un choix risqué](../07-3d-printing/06-why-pla-is-risky.md).
 
 ## Vérification avant mise sous tension
 
@@ -34,7 +34,7 @@ Comment utiliser un multimètre — [Multimètre](../05-tools/02-multimeter.md).
 
 ## Premier démarrage
 
-1. Appliquez la tension uniquement au contrôleur et aux capteurs (ne connectez pas encore la charge, si possible).
+1. Appliquez la tension uniquement au contrôleur et aux capteurs. Si un seul bloc d'alimentation alimente tout, alimentez le contrôleur séparément : par l'USB ou via un convertisseur abaisseur, et ne connectez pas encore le fil du radiateur.
 2. Assurez-vous que le dispositif est en ligne sur le portail et affiche la température et l'humidité.
 3. Connectez le radiateur et le ventilateur.
 4. Démarrez le mode maintien de la chaleur depuis le portail et observez.

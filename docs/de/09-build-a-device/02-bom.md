@@ -17,6 +17,8 @@ Auf dieser Seite finden Sie die Komponentenliste des Geräts und zwei Varianten 
 | Pullup-Widerstand für Thermistor | Spannungsteiler für ADC | Typischerweise `4,7 kΩ` |
 | Stromversorgung | Stromversorgung für Regler und Niedrigspannungsperipherie | Spannung gemäß gewählter Version |
 
+C3 und S3 sind für dieses Beispiel gleichwertig: Code, Anschluss und Montagereihenfolge sind identisch. Der S3 ist leistungsfähiger und hat mehr Speicher — nehmen Sie ihn, wenn Sie später ein Display, einen adressierbaren LED-Streifen oder eigene aufwendige Logik hinzufügen möchten.
+
 ESP32 wurde ausgewählt, weil er Wi-Fi enthält, über die erforderlichen Schnittstellen verfügt (I2C für SHT31, ADC für Thermistor, PWM zur Laststeuerung) und direkt von `idryer-core` unterstützt wird. Weitere Details — [ESP32-Regler](../02-controllers/01-esp32-controller.md).
 
 !!! warning "ESP32-Logik — 3.3V"

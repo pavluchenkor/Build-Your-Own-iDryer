@@ -30,6 +30,8 @@ El portal dibuja cada elemento del menú según su tipo. `role:` da al elemento 
 !!! warning "No edite los archivos generados"
     Los archivos `menu_state.*`, `menu_bindings.*`, `menu_ids.h` y otros los crea el generador. Edite solo `menu.yaml` y recompile — de lo contrario sus cambios se perderán.
 
+    El nombre de la constante de un elemento se forma de manera simple: `MENU_` más su `id` en mayúsculas. El elemento `target_temp` da `MENU_TARGET_TEMP`, `hysteresis` — `MENU_HYSTERESIS`. Estas constantes harán falta en el capítulo 7.
+
 ## Paso 1. Copie la plantilla
 
 La biblioteca contiene una plantilla de menú. Cópiela en su proyecto:
@@ -65,7 +67,7 @@ extra_scripts =                     ; ← agregado
     pre:extra_scripts/pre_gen_menu.py
 ```
 
-El gancho encontrará automáticamente el generador en la ruta `lib/idryer-core/menu/menu_gen.py`, por lo que la biblioteca debe estar conectada mediante `lib/` (enlace simbólico o copia), como se describe en el capítulo 4.
+El gancho encontrará automáticamente el generador en la ruta `lib/idryer-core/menu/menu_gen.py`, por lo que la biblioteca debe estar conectada mediante `lib/` (enlace simbólico o copia), como se describe en el capítulo 4. PlatformIO ejecuta el generador con su propio Python — no hay que instalar nada aparte. Si aun así la compilación falla en este paso, muestre el texto del error en la comunidad: [Telegram](https://t.me/iDryer), [Discord](https://discord.gg/jGce5eeHHz).
 
 ## Paso 3. Describa los parámetros del gabinete
 
@@ -233,12 +235,11 @@ Respecto al capítulo anterior se añadieron las líneas marcadas con `// ← ca
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // lecturas sin sensores (-DDEMO_SENSORS=1)
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // dispositivo propio: la tarjeta la arma el manifiesto
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -267,6 +268,23 @@ Respecto al capítulo anterior se añadieron las líneas marcadas con `// ← ca
         return tK - 273.15f;
     }
 
+    // Lecturas: sensores o, con -DDEMO_SENSORS=1, el modelo del armario
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
@@ -279,15 +297,7 @@ Respecto al capítulo anterior se añadieron las líneas marcadas con `// ← ca
     void loop() {
         s_link.loop();
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -296,16 +306,15 @@ Respecto al capítulo anterior se añadieron las líneas marcadas con `// ← ca
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // lecturas sin sensores (-DDEMO_SENSORS=1)
 #include <menu_state.h>                      // ← capítulo 6: parámetros (menu.target_temp …)
 #include <menu_bindings.h>                   // ← capítulo 6: menu_apply_by_bind
 #include <menu_commands.h>                   // ← capítulo 6: menu_buildFullJson
 #include <local_access/device_publisher.h>   // ← capítulo 6: publishConfigRaw
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // dispositivo propio: la tarjeta la arma el manifiesto
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -332,6 +341,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// Lecturas: sensores o, con -DDEMO_SENSORS=1, el modelo del armario
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 // ← capítulo 6: menú en el portal
@@ -385,19 +411,14 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 }
 ```
 
 ## Verificación del resultado
+
+![Menú del dispositivo en el portal](../../img/09-cabinet/06-portal-menu.png)
+*El menú llegó desde el dispositivo: temperatura de almacenamiento e histéresis con sus límites. El valor se puede cambiar aquí mismo — el dispositivo lo acepta, lo guarda y vuelve a enviar el menú.*
 
 Después de descargar el firmware:
 

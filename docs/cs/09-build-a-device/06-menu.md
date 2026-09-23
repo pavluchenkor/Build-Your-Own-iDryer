@@ -30,6 +30,8 @@ Portál kreslí každou položku menu podle jejího typu. `role:` dává položc
 !!! warning "Neupravujte vygenerované soubory"
     Soubory `menu_state.*`, `menu_bindings.*`, `menu_ids.h` a další vytváří generátor. Upravujte pouze `menu.yaml` a znovu sestavte — jinak budou vaše změny přepsány.
 
+    Název konstanty položky vzniká jednoduše: `MENU_` plus její `id` velkými písmeny. Položka `target_temp` dává `MENU_TARGET_TEMP`, `hysteresis` — `MENU_HYSTERESIS`. Tyto konstanty budou potřeba v kapitole 7.
+
 ## Krok 1. Zkopírujte šablonu
 
 V knihovně je šablona nabídky. Zkopírujte ji do projektu:
@@ -65,7 +67,7 @@ extra_scripts =                     ; ← přidáno
     pre:extra_scripts/pre_gen_menu.py
 ```
 
-Hák sám najde generátor na cestě `lib/idryer-core/menu/menu_gen.py`, takže knihovna musí být připojena přes `lib/` (symlink nebo kopie), jak je popsáno v kapitole 4.
+Hák sám najde generátor na cestě `lib/idryer-core/menu/menu_gen.py`, takže knihovna musí být připojena přes `lib/` (symlink nebo kopie), jak je popsáno v kapitole 4. Generátor spouští PlatformIO svým Pythonem — nic zvlášť instalovat netřeba. Pokud přesto sestavení v tomto kroku spadne, ukažte text chyby v komunitě: [Telegram](https://t.me/iDryer), [Discord](https://discord.gg/jGce5eeHHz).
 
 ## Krok 3. Popište parametry skříně
 
@@ -233,12 +235,11 @@ Oproti předchozí kapitole přibyly řádky označené `// ← kapitola 6`: na�
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // hodnoty bez senzorů (-DDEMO_SENSORS=1)
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // vlastní zařízení: kartu sestavuje manifest
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -267,6 +268,23 @@ Oproti předchozí kapitole přibyly řádky označené `// ← kapitola 6`: na�
         return tK - 273.15f;
     }
 
+    // Hodnoty: senzory nebo, s -DDEMO_SENSORS=1, model skříně
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
@@ -279,15 +297,7 @@ Oproti předchozí kapitole přibyly řádky označené `// ← kapitola 6`: na�
     void loop() {
         s_link.loop();
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -296,16 +306,15 @@ Oproti předchozí kapitole přibyly řádky označené `// ← kapitola 6`: na�
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // hodnoty bez senzorů (-DDEMO_SENSORS=1)
 #include <menu_state.h>                      // ← kapitola 6: parametry (menu.target_temp …)
 #include <menu_bindings.h>                   // ← kapitola 6: menu_apply_by_bind
 #include <menu_commands.h>                   // ← kapitola 6: menu_buildFullJson
 #include <local_access/device_publisher.h>   // ← kapitola 6: publishConfigRaw
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // vlastní zařízení: kartu sestavuje manifest
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -332,6 +341,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// Hodnoty: senzory nebo, s -DDEMO_SENSORS=1, model skříně
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 // ← kapitola 6: menu na portálu
@@ -385,19 +411,14 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 }
 ```
 
 ## Ověření výsledku
+
+![Menu zařízení na portálu](../../img/09-cabinet/06-portal-menu.png)
+*Menu přišlo ze zařízení: teplota uložení a hystereze se svými mezemi. Hodnotu lze změnit přímo zde — zařízení ji přijme, uloží a pošle menu znovu.*
 
 Po nahrání firmwaru:
 

@@ -15,8 +15,10 @@ Sie benötigen:
 
 - VS Code mit PlatformIO-Erweiterung;
 - USB-Kabel;
-- Wi-Fi-Netzwerk `2.4 GHz` (ESP32 funktioniert nicht mit reinen `5 GHz`-Netzwerken).
-- ein Smartphone mit der iDryer-App, angemeldet mit Ihrem iDryer-Portalkonto: darüber bekommt das Gerät das WLAN und wird mit dem Konto gekoppelt.
+- Wi-Fi-Netzwerk `2.4 GHz` (ESP32 funktioniert nicht mit reinen `5 GHz`-Netzwerken);
+- ein Smartphone mit der iDryer-App ([App Store](https://apps.apple.com/app/idryer/id6760609044), [Google Play](https://play.google.com/store/apps/details?id=org.idryer.mobile)), angemeldet mit Ihrem iDryer-Portalkonto: darüber bekommt das Gerät das WLAN und wird mit dem Konto gekoppelt;
+- die Kern-Bibliothek [idryer-core](https://github.com/pavluchenkor/idryer-core);
+- das fertige Projekt dieses Kapitels — [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet) im Repository des Handbuchs: daher stammen der Sensortreiber und weitere Dateien, die weiter unten zum Kopieren vorgeschlagen werden.
 
 Was eine Controller-Firmware ist und wie sie auf die Platine gelangt — [Controller-Firmware](../02-controllers/11-flashing-controller.md).
 
@@ -38,14 +40,21 @@ Alle unten stehenden Code-Fragmente gehen in diese Dateien — jeder Schritt gib
 Legen Sie die Bibliothek `idryer-core` in `lib/` — PlatformIO findet Bibliotheken dort automatisch. Das Einfachste ist, einen Symlink zur heruntergeladenen Bibliothek zu erstellen:
 
 ```bash
-ln -s /path/to/idryer-core lib/idryer-core
+git clone https://github.com/pavluchenkor/idryer-core.git ~/idryer-core
+ln -s ~/idryer-core lib/idryer-core
 ```
+
+Statt eines Symlinks können Sie den Ordner der Bibliothek einfach nach `lib/idryer-core` kopieren — das funktioniert genauso.
 
 Dies ist auch für die Menü-Generierung erforderlich (Kapitel 6) — der Hook sucht den Generator im `lib/idryer-core/`-Verzeichnis.
 
 ## 3. WLAN und Kopplung stehen nicht im Code
 
 Die Firmware enthält weder das WLAN-Passwort noch Kontodaten. Beim ersten Start hat das Gerät kein WLAN und wartet auf Einstellungen: die iDryer-App sendet sie per Funk (ESPTouch) und koppelt das Gerät dann mit einem einmaligen Kopplungstoken an Ihr Konto. Der Core erledigt das alles in `s_link.begin()` und `s_link.loop()`, Sie gehen nur die Schritte in der App durch — Abschnitt 9.
+
+**Wie das Netzwerk ins Gerät gelangt.** Eine Platine ohne gespeichertes Netzwerk hört den Äther ab wie ein Empfänger, der auf keinen Sender eingestellt ist. Das Telefon „klopft" in dieser Zeit den Netzwerknamen und das Passwort in die Luft — ungefähr wie mit dem Morsealphabet, nur mit Wi-Fi-Paketen. Die Platine fängt diese Übertragung auf, verbindet sich mit dem Netzwerk und geht danach bei jedem Einschalten selbst hinein. Eigene Pins und Leitungen sind dafür nicht nötig: es arbeitet die reguläre Antenne der Platine, es startet von selbst, solange kein Netzwerk vorhanden ist, und dauert bis zu 90 Sekunden.
+
+Wenn es per Funk nicht klappt, gibt es den Weg über Kabel: der Web-Installer [install.idryer.org](https://install.idryer.org) übergibt der Platine Netzwerk und Kopplungstoken über USB — dasselbe, was die App tut, nur per Kabel. Es hilft auch ein normaler Neustart der Platine: danach wartet sie wieder auf Einstellungen.
 
 ## 4. Konfigurieren Sie platformio.ini
 
@@ -87,18 +96,10 @@ Für einen beheizten Schrank am Anfang von `src/main.cpp`
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // eigenes Gerät: die Karte baut das Manifest
     .unitsCount        = 1,
-    // Peripherie:
-    .hasHeater         = true,    // gesteuerter Heizer
-    .hasFan            = true,    // Lüfter
-    .hasAirTemp        = true,    // Lufttemperatur (SHT31)
-    .hasAirHumidity    = true,    // Luftfeuchtigkeit (SHT31)
-    .hasHeaterTemp     = true,    // Heizer-Temperatur (Thermistor)
-    // Auto-Veröffentlichungsperioden:
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
-    // Identifizierung auf dem Portal:
     .hardwareVersion   = "1.0",
     .firmwareVersion   = "0.1.0",
     .model             = "DIY Storage Cabinet",
@@ -139,13 +140,8 @@ Nehmen Sie beide Blöcke von oben in eine Datei — das ist die gesamte `src/mai
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // eigenes Gerät: die Karte baut das Manifest
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -189,7 +185,7 @@ Solange das Gerät kein WLAN hat, bleibt das Log still: der Core hält die serie
 [INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-Lassen Sie den Monitor offen und wechseln Sie zur App.
+Die letzte Zeile ist genau das, was in diesem Schritt gebraucht wird: das Netzwerk steht, ein Kopplungsgeheimnis gibt es nicht, das Gerät wartet auf das Token aus der App. Lassen Sie den Monitor offen und wechseln Sie zur App.
 
 ## 9. WLAN verbinden und Gerät in der App koppeln
 
@@ -200,6 +196,15 @@ Lassen Sie den Monitor offen und wechseln Sie zur App.
 5. Nach **Gerät gekoppelt** erscheint das Gerät in der Geräteliste im Portal und in der App.
 
 Ist das Gerät schon im Netz, öffnen Sie gleich den Schritt **Kopplung** — tippen Sie oben im Fenster auf seinen Chip.
+
+![Schritt WLAN in der App: Netzwerkname und Passwort](../../img/09-cabinet/04-app-wifi.png)
+*Schritt **WLAN**: die App überträgt das Netzwerk per Funk an das Gerät.*
+
+![Schritt Kopplung: die App hat das Gerät im Netz gefunden](../../img/09-cabinet/04-app-pairing.png)
+*Schritt **Kopplung**: die App hat das Gerät anhand seiner Seriennummer im Netz gefunden. Fremde Geräte sind als belegt markiert.*
+
+![Meldung „Gerät gekoppelt"](../../img/09-cabinet/04-app-paired.png)
+*Fertig: das Gerät ist mit dem Konto gekoppelt und erscheint gleich in der Liste.*
 
 Im Log ist die Kopplung zu sehen:
 
@@ -213,11 +218,20 @@ Im Log ist die Kopplung zu sehen:
 
 ## Überprüfung des Ergebnisses
 
-In diesem Stadium sollte das Gerät im Portal Online sein. Sensordaten gibt es noch keine — das ist erwartet. Wenn etwas schiefging:
+In diesem Stadium sollte das Gerät im Portal Online sein. Sensordaten gibt es noch keine — das ist erwartet: `Config` hat noch nichts über sie deklariert, und die Karte hat nichts zu zeigen.
 
-- die App hat nicht gesehen, dass das Gerät ins Netz kam — prüfen Sie das Passwort und dass das Netz `2.4 GHz` ist; bei falschem Passwort wartet das Gerät wieder auf Einstellungen, wiederholen Sie den Schritt WLAN;
+![Gerätekarte im Portal direkt nach der Kopplung](../../img/09-cabinet/04-portal-card.png)
+*Das Gerät im Portal: Name, Zustand Idle, Verbindungssymbol. Messwerte gibt es keine — sie erscheinen im nächsten Kapitel.*
+
+Der Name `Device DEVICE_…` ist der Werksname. Benennen Sie das Gerät über das Stiftsymbol neben dem Namen um: in den weiteren Beispielen heißt es „Storage cabinet".
+
+Wenn etwas schiefging:
+
+- die App hat nicht gesehen, dass das Gerät ins Netz kam — prüfen Sie das Passwort und dass das Netz `2.4 GHz` ist; bei falschem Passwort wartet das Gerät wieder auf Einstellungen, starten Sie die Platine neu und wiederholen Sie den Schritt WLAN;
+- das Netzwerk wird per Funk gar nicht übertragen — machen Sie dasselbe per USB über den Web-Installer [install.idryer.org](https://install.idryer.org);
 - im Schritt **Kopplung** hat die App das Gerät nicht gefunden — Telefon und Gerät müssen im selben Netz sein, und das Netz darf die Geräteerkennung nicht blockieren (Gastnetze tun das oft);
 - das Gerät startet neu — prüfen Sie die Stromversorgung des ESP32 (Spannungseinbrüche beim Start sind eine häufige Ursache für Resets);
+- der Build bricht mit einem Fehler ab — fragen Sie in der Community: [Telegram](https://t.me/iDryer), [Discord](https://discord.gg/jGce5eeHHz);
 - siehe [Stromversorgungsfehler](../08-common-mistakes/02-power-mistakes.md) und [Controller-Fehler](../08-common-mistakes/04-controller-mistakes.md).
 
 ## Was kommt als Nächstes

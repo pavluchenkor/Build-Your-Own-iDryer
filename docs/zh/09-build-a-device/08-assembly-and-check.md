@@ -18,7 +18,7 @@ description: "ESP32 柜的最终组装：在外壳中安装、首次升温、温
 外壳要求和节点放置 — [外壳设计](../07-3d-printing/05-enclosure-design.md)。
 
 !!! warning "打印部件靠近加热"
-    PLA 在接近加热器的温度附近软化。靠近热量的部件应从耐热材料打印。见[耐热材料](../07-3d-printing/04-heat-resistant-materials.md)和[为什么 PLA 有风险](../07-3d-printing/06-why-pla-is-risky.md)。
+    PLA 在接近加热器的温度附近软化。靠近热量的部件应从耐热材料打印：ABS、ASA 或 PA（尼龙）。见[耐热材料](../07-3d-printing/04-heat-resistant-materials.md)和[为什么 PLA 有风险](../07-3d-printing/06-why-pla-is-risky.md)。
 
 ## 通电前检查
 
@@ -34,7 +34,7 @@ description: "ESP32 柜的最终组装：在外壳中安装、首次升温、温
 
 ## 首次启动
 
-1. 仅向控制器和传感器供电（暂不连接负载，如果可能的话）。
+1. 仅向控制器和传感器供电。如果整机只有一个电源，请单独给控制器供电：用 USB 或通过降压转换器，加热器的导线暂不连接。
 2. 确保设备在门户网站上处于在线状态并显示温度和湿度。
 3. 连接加热器和风扇。
 4. 从门户网站启动热维护模式并观察。

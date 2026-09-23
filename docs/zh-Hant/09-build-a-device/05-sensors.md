@@ -19,7 +19,7 @@ description: "在ESP32上讀取SHT31氣候感應器和加熱器溫敏電阻：�
 | `s_link.telemetry.airHumidityPct[0]` | 空氣濕度，% | `hasAirHumidity` |
 | `s_link.telemetry.heaterTempC[0]` | 加熱器溫度，°C | `hasHeaterTemp` |
 
-所有三個標誌我們已在[上一步的Config中](04-firmware-start.md)啟用。
+這三個標誌就在本章的`Config`中啟用（完整程式碼見本章結尾）。標誌告訴門戶和應用程式：裝置有這個感應器；沒有它，卡片上不會出現對應的讀數格。
 
 ## 規則：感應器程式碼不應阻止loop()
 
@@ -27,7 +27,7 @@ idryer-core外觀在相同的`loop()`中為Wi-Fi和MQTT服務。因此，讀取�
 
 ## 步驟1。SHT31：櫃氣候
 
-SHT31驅動程式無需從頭寫起——現成的`Sht31ClimateSensor`類在`iDryer-Storage`範例中。它使用`robtillaart/SHT31`函式庫並無阻塞地讀取感應器。
+SHT31驅動程式無需從頭寫起——現成的`Sht31ClimateSensor`類就在本章的範例 [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet) 中。它使用`robtillaart/SHT31`函式庫並無阻塞地讀取感應器。
 
 1. 將SHT31函式庫新增到你`platformio.ini`的`lib_deps`：
 
@@ -36,7 +36,12 @@ SHT31驅動程式無需從頭寫起——現成的`Sht31ClimateSensor`類在`iDr
         robtillaart/SHT31 @ ^0.5.0
     ```
 
-2. 從`iDryer-Storage/src/storage/sensors/`複製四個檔案到你的`src/`資料夾：`Sht31ClimateSensor.h`、`Sht31ClimateSensor.cpp`、`IClimateSensor.h`和`sensor_reading.h`。
+2. 把驅動程式的四個檔案複製到你的`src/`資料夾：
+
+    ```bash
+    git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+    cp ~/byo-idryer/example/09-cabinet/src/{Sht31ClimateSensor.h,Sht31ClimateSensor.cpp,IClimateSensor.h,sensor_reading.h} src/
+    ```
 
 3. 透過I2C連接感應器（見[接線圖](03-wiring.md)）並在`src/main.cpp`中讀取它：
 
@@ -71,7 +76,20 @@ void loop() {
 }
 ```
 
-`SensorReading`結構（欄位`ok`、`temperature`、`humidity`）在`sensor_reading.h`中聲明。刷新後，門戶將顯示櫃的溫度和濕度——這是設備的第一個反饋。
+驅動程式用`sensor_reading.h`中的`SensorReading`結構交出一次讀數快照：
+
+```cpp
+struct SensorReading {
+    float    temperature = NAN;   // °C，沒有值時為NAN
+    float    humidity    = NAN;   // % RH，沒有值時為NAN
+    float    pressure    = NAN;   // hPa，為將來的感應器預留
+    uint32_t ts_ms       = 0;     // 讀取當下的millis()
+    bool     ok          = false; // 溫度和濕度有效時為true
+    int      err         = 0;     // 錯誤碼，0——無錯誤
+};
+```
+
+刷新後，門戶將顯示櫃的溫度和濕度——這是設備的第一個反饋。
 
 ## 步驟2。溫敏電阻：加熱器溫度
 
@@ -91,7 +109,8 @@ static float readHeaterTempC() {
     int   raw = analogRead(THERM_PIN);          // ESP32上0..4095
     float v   = (float)raw / 4095.0f;           // 完整範圍的比例
     float r   = SERIES_R * (1.0f - v) / v;      // 溫敏電阻電阻，Ω
-    // Steinhart-Hart方程（B參數）：
+    // B參數形式的Steinhart-Hart方程——見維基百科：
+    // https://en.wikipedia.org/wiki/Steinhart%E2%80%93Hart_equation
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
 }
@@ -108,6 +127,37 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 
 用萬用表檢查溫敏電阻——[溫敏電阻檢查](../06-practical-guides/02-checking-thermistor.md)。
 
+## 步驟3。手邊沒有感應器？示範模式
+
+沒有硬體也能走完到卡片的整條路：讀數由櫃子的模型算出來。從同一個範例複製`demo_sensors.h`檔案：
+
+```bash
+cp ~/byo-idryer/example/09-cabinet/src/demo_sensors.h src/
+```
+
+並在`platformio.ini`中加上建置旗標：
+
+```ini
+build_flags =
+    -DDEMO_SENSORS=1
+```
+
+兩個分支都藏在同一個函式後面，`loop()`不知道值是從哪裡來的：
+
+```cpp
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    // 讀取SHT31和溫敏電阻——如上
+#endif
+}
+```
+
+模型的行為和真正的櫃子一樣：房間溫度在`24 °C`附近緩慢波動，加熱器開啟時空氣升溫，關閉時逐漸冷卻，加熱時濕度下降。模型從遙測中讀取加熱功率，因此[加熱控制](07-heating-control.md)一章的邏輯能看到回應，滯後也能正常運作。本節中的螢幕截圖就是這樣做出來的。
+
+正式裝置不要設這個旗標：那時建置的是使用真實感應器的分支。
+
 ## 本章後的完整`src/main.cpp`
 
 下面是整個檔案。相對於上一章的新行標記為`// ← 第5章`；其餘部分未改變。
@@ -118,13 +168,8 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
     #include <iDryer.h>
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // 自製裝置：卡片由 card 清單組成
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
-        .hasAirTemp        = true,
-        .hasAirHumidity    = true,
-        .hasHeaterTemp     = true,
         .telemetryPeriodMs = 5000,
         .statusPeriodMs    = 10000,
         .hardwareVersion   = "1.0",
@@ -150,15 +195,14 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 #include <Wire.h>                  // ← 第5章
 #include <math.h>                  // ← 第5章
 #include "Sht31ClimateSensor.h"    // ← 第5章
+#include "demo_sensors.h"    // ← 第5章：沒有感應器時的讀數（-DDEMO_SENSORS=1）
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自製裝置：卡片由 card 清單組成
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
+    .hasAirTemp        = true,     // ← 第5章
+    .hasAirHumidity    = true,     // ← 第5章
+    .hasHeaterTemp     = true,  // ← 第5章
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -186,6 +230,23 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← 第5章：感應器，或者在 -DDEMO_SENSORS=1 時用櫃子模型
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);                 // ← 第5章（SDA, SCL — 你的板的引腳）
@@ -198,19 +259,14 @@ void setup() {
 void loop() {
     s_link.loop();
 
-    if (s_climateOk) {                                       // ← 第5章
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();     // ← 第5章
+    readSensors();   // ← 第5章
 }
 ```
 
 ## 驗證結果
+
+![門戶上的裝置頁面：讀數和圖表](../../img/09-cabinet/05-portal-device.png)
+*卡片上的讀數和遙測圖表。加熱器溫度在圖表上是單獨的一條線。頁面下方的選單目前是空的——下一章會處理它。*
 
 此步驟後，門戶應顯示三個值：
 

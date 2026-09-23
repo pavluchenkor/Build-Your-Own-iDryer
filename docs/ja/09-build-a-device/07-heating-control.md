@@ -138,6 +138,12 @@ void loop() {
 
 起動と停止は、ポータルとアプリのデバイスカードから届きます。ファームウェアはこれをカードの **アクション** として宣言します。コアがそれを card マニフェストに追加し、ポータルとアプリがフォームとボタンを自分で描画します。コード内でコマンドを解析する必要はありません。コアがあなたの関数を呼びます。
 
+![起動フォーム付きのカード](../../img/09-cabinet/07-portal-card.png)
+*カードはマニフェストから組み立てられています：左に読み取り値（加熱出力とファンを含む）、右に温度と起動ボタンのフォーム。ポータルはこのデバイスについて何も知りませんでした — すべてファームウェアから届いたものです。*
+
+![アプリでの同じカード](../../img/09-cabinet/07-app-card.png)
+*アプリでも同じマニフェストから同じものが表示されます：読み取り値、温度フィールド、起動ボタン。*
+
 温度フィールドの範囲とデフォルト値は、ブリッジ `card_menu_bridge.h` を通じてメニュー項目 `target_temp`（30〜50 °C、45）から取ります。ユーザーが入力した値は起動コマンドと一緒に送られ、メニューには書き込まれません。第6章のメニューのヘッダーの隣にヘッダーを追加します：
 
 ```cpp
@@ -206,16 +212,15 @@ card.action("stop", "IDLE", onStop)
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // センサーなしでの読み取り値（-DDEMO_SENSORS=1）
     #include <menu_state.h>                      // ← 章6：パラメーター（menu.target_temp …）
     #include <menu_bindings.h>                   // ← 章6：menu_apply_by_bind
     #include <menu_commands.h>                   // ← 章6：menu_buildFullJson
     #include <local_access/device_publisher.h>   // ← 章6：publishConfigRaw
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // 自作デバイス：カードはマニフェストが組み立てる
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -242,6 +247,23 @@ card.action("stop", "IDLE", onStop)
         float r   = SERIES_R * (1.0f - v) / v;
         float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
         return tK - 273.15f;
+    }
+
+    // 読み取り値：センサー、または-DDEMO_SENSORS=1ならシャフトのモデル
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
     }
 
     // ← 章6：ポータルのメニュー
@@ -295,15 +317,7 @@ card.action("stop", "IDLE", onStop)
             publishMenu();
         }
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -312,6 +326,7 @@ card.action("stop", "IDLE", onStop)
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // センサーなしでの読み取り値（-DDEMO_SENSORS=1）
 #include <menu_state.h>
 #include <menu_bindings.h>
 #include <menu_commands.h>
@@ -319,10 +334,10 @@ card.action("stop", "IDLE", onStop)
 #include <card/card_menu_bridge.h>        // ← 章7
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自作デバイス：カードはマニフェストが組み立てる
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
+    .hasHeater         = true,     // ← 章7
+    .hasFan            = true,        // ← 章7
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -349,6 +364,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// 読み取り値：センサー、または-DDEMO_SENSORS=1ならシャフトのモデル
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 static bool s_menuPending = false;
@@ -460,15 +492,7 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 
     controlLoop();   // ← 章7
     applyHeater();   // ← 章7
@@ -477,6 +501,18 @@ void loop() {
 ```
 
 ## 結果の確認
+
+![保管を開始した直後のカード](../../img/09-cabinet/07-portal-session.png)
+*開始直後：Storageモード、目標45 °C、出力100 %、ファン稼働、経過時間のカウントが進んでいます。*
+
+![3分間の加熱後のカードとグラフ](../../img/09-cabinet/07-portal-heating.png)
+*3分後：シャフト内の空気温度が上がり、湿度は下がり、加熱器は動作温度に達しました。グラフでは、ヒステリシスによって出力がオン・オフする様子が見えます。*
+
+![アプリからの保管の開始](../../img/09-cabinet/07-app-session.png)
+*保管はアプリからも開始できます：「停止」ボタンと経過時間のカウントが表示されます。*
+
+![3分後のアプリでの加熱](../../img/09-cabinet/07-app-heating.png)
+*3分後のアプリ：45 °Cのうち43.9 °C、湿度は51 %から33 %に下がりました。グラフでは温度が上昇し、湿度が低下しています。*
 
 このステップの後：
 

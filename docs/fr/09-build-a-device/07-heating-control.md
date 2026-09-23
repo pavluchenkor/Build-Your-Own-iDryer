@@ -138,6 +138,12 @@ Les champs de télémétrie (`heaterPower01`, `fanOn`) sont publiés par la faç
 
 Le démarrage et l'arrêt viennent de la carte de l'appareil dans le portail et dans l'application. Le firmware les déclare comme **actions** de la carte : le core les ajoute au card manifest, et le portail et l'application dessinent eux-mêmes le formulaire et les boutons. Inutile d'analyser des commandes dans votre code : le core appelle votre fonction.
 
+![Carte avec le formulaire de démarrage](../../img/09-cabinet/07-portal-card.png)
+*La carte est construite à partir du manifeste : à gauche les relevés, y compris la puissance de chauffe et le ventilateur, à droite le formulaire avec la température et le bouton de démarrage. Le portail ne savait rien de cet appareil — tout est venu du firmware.*
+
+![La même carte dans l'application](../../img/09-cabinet/07-app-card.png)
+*Dans l'application, c'est la même chose et depuis le même manifeste : les relevés, le champ de température et le bouton de démarrage.*
+
 Les limites du champ de température et sa valeur par défaut viennent de l'élément de menu `target_temp` (30–50 °C, 45) via le pont `card_menu_bridge.h`. La valeur saisie part avec la commande de démarrage et n'est pas écrite dans le menu. Ajoutez l'en-tête à côté des en-têtes du menu du chapitre 6 :
 
 ```cpp
@@ -206,16 +212,15 @@ C'est le fichier final et complété du dispositif. Les nouvelles lignes par rap
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // relevés sans capteurs (-DDEMO_SENSORS=1)
     #include <menu_state.h>                      // ← chapitre 6 : paramètres (menu.target_temp …)
     #include <menu_bindings.h>                   // ← chapitre 6 : menu_apply_by_bind
     #include <menu_commands.h>                   // ← chapitre 6 : menu_buildFullJson
     #include <local_access/device_publisher.h>   // ← chapitre 6 : publishConfigRaw
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // appareil personnalisé : la carte est construite par le manifeste
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -242,6 +247,23 @@ C'est le fichier final et complété du dispositif. Les nouvelles lignes par rap
         float r   = SERIES_R * (1.0f - v) / v;
         float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
         return tK - 273.15f;
+    }
+
+    // Relevés : capteurs ou, avec -DDEMO_SENSORS=1, modèle du cabinet
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
     }
 
     // ← chapitre 6 : menu sur le portail
@@ -295,15 +317,7 @@ C'est le fichier final et complété du dispositif. Les nouvelles lignes par rap
             publishMenu();
         }
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -312,6 +326,7 @@ C'est le fichier final et complété du dispositif. Les nouvelles lignes par rap
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // relevés sans capteurs (-DDEMO_SENSORS=1)
 #include <menu_state.h>
 #include <menu_bindings.h>
 #include <menu_commands.h>
@@ -319,10 +334,10 @@ C'est le fichier final et complété du dispositif. Les nouvelles lignes par rap
 #include <card/card_menu_bridge.h>        // ← chapitre 7
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // appareil personnalisé : la carte est construite par le manifeste
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
+    .hasHeater         = true,     // ← chapitre 7
+    .hasFan            = true,        // ← chapitre 7
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -349,6 +364,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// Relevés : capteurs ou, avec -DDEMO_SENSORS=1, modèle du cabinet
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 static bool s_menuPending = false;
@@ -460,15 +492,7 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 
     controlLoop();   // ← chapitre 7
     applyHeater();   // ← chapitre 7
@@ -477,6 +501,18 @@ void loop() {
 ```
 
 ## Vérification du résultat
+
+![La carte juste après le démarrage du stockage](../../img/09-cabinet/07-portal-session.png)
+*Juste après le démarrage : mode Storage, cible 45 °C, puissance 100 %, ventilateur en marche, le décompte du temps est lancé.*
+
+![La carte et le graphique après trois minutes de chauffe](../../img/09-cabinet/07-portal-heating.png)
+*Après trois minutes : l'air de l'armoire est monté, l'humidité est tombée, le radiateur a atteint sa température de travail. Sur le graphique, on voit la puissance s'enclencher et se couper selon l'hystérésis.*
+
+![Démarrage du stockage depuis l'application](../../img/09-cabinet/07-app-session.png)
+*Le stockage peut aussi être lancé depuis l'application : le bouton « Arrêter » et le décompte du temps apparaissent.*
+
+![La chauffe dans l'application après trois minutes](../../img/09-cabinet/07-app-heating.png)
+*Après trois minutes dans l'application : 43,9 sur 45 °C, l'humidité est tombée de 51 à 33 %. Sur le graphique, la température monte, l'humidité descend.*
 
 Après cette étape :
 

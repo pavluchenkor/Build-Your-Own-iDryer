@@ -138,6 +138,12 @@ Die Telemetrie-Felder (`heaterPower01`, `fanOn`) veröffentlicht die Fassade sel
 
 Start und Stopp kommen von der Gerätekarte im Portal und in der App. Die Firmware deklariert sie als **Aktionen** der Karte: der Core fügt sie ins Card-Manifest ein, Portal und App zeichnen Formular und Schaltflächen selbst. Befehle im Code auszuwerten ist nicht nötig — der Core ruft Ihre Funktion auf.
 
+![Karte mit Startformular](../../img/09-cabinet/07-portal-card.png)
+*Die Karte ist aus dem Manifest zusammengesetzt: links die Messwerte, darunter Heizleistung und Lüfter, rechts das Formular mit Temperatur und Startschaltfläche. Das Portal wusste nichts über dieses Gerät — alles kam von der Firmware.*
+
+![Dieselbe Karte in der App](../../img/09-cabinet/07-app-card.png)
+*In der App dasselbe und aus demselben Manifest: Messwerte, Temperaturfeld und Startschaltfläche.*
+
 Die Grenzen des Temperaturfelds und der Standardwert kommen aus dem Menüpunkt `target_temp` (30–50 °C, 45) über die Brücke `card_menu_bridge.h`. Der eingegebene Wert geht mit dem Startbefehl mit und wird nicht ins Menü geschrieben. Fügen Sie den Header neben den Menü-Headern aus Kapitel 6 hinzu:
 
 ```cpp
@@ -206,16 +212,15 @@ Dies ist die endgültige, vollständige Datei des Geräts. Neue Zeilen gegenübe
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // Messwerte ohne Sensoren (-DDEMO_SENSORS=1)
     #include <menu_state.h>                      // ← Kapitel 6: Parameter (menu.target_temp …)
     #include <menu_bindings.h>                   // ← Kapitel 6: menu_apply_by_bind
     #include <menu_commands.h>                   // ← Kapitel 6: menu_buildFullJson
     #include <local_access/device_publisher.h>   // ← Kapitel 6: publishConfigRaw
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // eigenes Gerät: die Karte baut das Manifest
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -242,6 +247,23 @@ Dies ist die endgültige, vollständige Datei des Geräts. Neue Zeilen gegenübe
         float r   = SERIES_R * (1.0f - v) / v;
         float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
         return tK - 273.15f;
+    }
+
+    // Messwerte: Sensoren oder, mit -DDEMO_SENSORS=1, das Modell des Schranks
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
     }
 
     // ← Kapitel 6: Menü im Portal
@@ -295,15 +317,7 @@ Dies ist die endgültige, vollständige Datei des Geräts. Neue Zeilen gegenübe
             publishMenu();
         }
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -312,6 +326,7 @@ Dies ist die endgültige, vollständige Datei des Geräts. Neue Zeilen gegenübe
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // Messwerte ohne Sensoren (-DDEMO_SENSORS=1)
 #include <menu_state.h>
 #include <menu_bindings.h>
 #include <menu_commands.h>
@@ -319,10 +334,10 @@ Dies ist die endgültige, vollständige Datei des Geräts. Neue Zeilen gegenübe
 #include <card/card_menu_bridge.h>        // ← Kapitel 7
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // eigenes Gerät: die Karte baut das Manifest
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
+    .hasHeater         = true,     // ← Kapitel 7
+    .hasFan            = true,        // ← Kapitel 7
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -349,6 +364,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// Messwerte: Sensoren oder, mit -DDEMO_SENSORS=1, das Modell des Schranks
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 static bool s_menuPending = false;
@@ -460,15 +492,7 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 
     controlLoop();   // ← Kapitel 7
     applyHeater();   // ← Kapitel 7
@@ -477,6 +501,18 @@ void loop() {
 ```
 
 ## Überprüfung des Ergebnisses
+
+![Karte direkt nach dem Start der Lagerung](../../img/09-cabinet/07-portal-session.png)
+*Direkt nach dem Start: Modus Storage, Ziel 45 °C, Leistung 100 %, Lüfter an, die Zeit läuft.*
+
+![Karte und Diagramm nach drei Minuten Heizen](../../img/09-cabinet/07-portal-heating.png)
+*Nach drei Minuten: die Luft im Schrank ist wärmer geworden, die Feuchte ist gefallen, der Heizer hat seine Arbeitstemperatur erreicht. Im Diagramm ist zu sehen, wie sich die Leistung nach der Hysterese ein- und ausschaltet.*
+
+![Start der Lagerung aus der App](../../img/09-cabinet/07-app-session.png)
+*Die Lagerung lässt sich auch aus der App starten: es erscheinen die Schaltfläche „Stopp" und die laufende Zeit.*
+
+![Heizen in der App nach drei Minuten](../../img/09-cabinet/07-app-heating.png)
+*Nach drei Minuten in der App: 43,9 von 45 °C, die Feuchte ist von 51 auf 33 % gefallen. Im Diagramm geht die Temperatur nach oben, die Feuchte nach unten.*
 
 Nach diesem Schritt:
 

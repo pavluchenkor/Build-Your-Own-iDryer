@@ -15,8 +15,10 @@ description: "idryer-coreライブラリでPlatformIOプロジェクトを作成
 
 - VS CodeとPlatformIOエクステンション；
 - USBケーブル；
-- Wi-Fi`2.4 GHz`ネットワーク（ESP32は5 GHzのみのネットワークで動作しません）。
-- iDryerポータルのアカウントでログインしたiDryerアプリ入りのスマートフォン：デバイスはアプリ経由でWi-Fiを受け取り、アカウントに紐付けられます。
+- Wi-Fi`2.4 GHz`ネットワーク（ESP32は5 GHzのみのネットワークで動作しません）；
+- iDryerポータルのアカウントでログインしたiDryerアプリ（[App Store](https://apps.apple.com/app/idryer/id6760609044)、[Google Play](https://play.google.com/store/apps/details?id=org.idryer.mobile)）入りのスマートフォン：デバイスはアプリ経由でWi-Fiを受け取り、アカウントに紐付けられます；
+- コアライブラリ [idryer-core](https://github.com/pavluchenkor/idryer-core)；
+- この章の完成プロジェクト — 教材リポジトリ内の [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet)：センサードライバーや、この先コピーすることになるファイルはここから取得します。
 
 コントローラーファームウェアとボードへの入り方について - [コントローラーファームウェア](../02-controllers/11-flashing-controller.md)。
 
@@ -38,14 +40,21 @@ my-cabinet/
 `idryer-core`ライブラリを`lib/`に配置します。PlatformIOはそこから自動的にライブラリを見つけます。最も簡単な方法は、ダウンロードしたライブラリへのシムリンクを作成することです：
 
 ```bash
-ln -s /path/to/idryer-core lib/idryer-core
+git clone https://github.com/pavluchenkor/idryer-core.git ~/idryer-core
+ln -s ~/idryer-core lib/idryer-core
 ```
+
+シムリンクの代わりに、ライブラリのフォルダを`lib/idryer-core`にコピーするだけでも構いません。動作は同じです。
 
 これはメニュー生成（章6）にも必要です。フックは`lib/idryer-core/`内でジェネレーターを探します。
 
 ## 3. Wi-Fiと紐付けはコードに書かない
 
 ファームウェアにはネットワークのパスワードもアカウント情報も入っていません。初回起動時、デバイスにはWi-Fiがなく、設定を待ちます。iDryerアプリが設定を無線（ESPTouch）で送り、続いて使い捨ての紐付けトークンでデバイスをあなたのアカウントに紐付けます。これらはすべてコアが`s_link.begin()`と`s_link.loop()`の中で行います。あなたはアプリの手順を進めるだけです — セクション9。
+
+**ネットワーク情報がデバイスに届くしくみ。** 保存されたネットワークを持たないボードは、選局していない受信機のように電波を聞いています。その間、スマートフォンはネットワーク名とパスワードを空間に「叩き出し」ます — モールス信号のようなもので、実際にはWi-Fiパケットです。ボードはこの送信を捉えてネットワークに接続し、以後は電源投入のたびに自分で接続します。このために専用のピンや配線は不要です：ボード標準のアンテナが使われ、ネットワークがない間は自動的に有効になり、最大90秒間続きます。
+
+無線でうまくいかない場合は有線の方法があります：Webインストーラー [install.idryer.org](https://install.idryer.org) がUSB経由でボードにネットワークと紐付けトークンを渡します — アプリが行うことと同じで、ケーブル経由なだけです。ボードの通常の再起動も有効です：再起動後、ボードは再び設定を待ちます。
 
 ## 4. platformio.iniを設定する
 
@@ -87,18 +96,10 @@ build_flags =
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自作デバイス：カードはマニフェストが組み立てる
     .unitsCount        = 1,
-    // ペリフェリー：
-    .hasHeater         = true,    // 制御された加熱器
-    .hasFan            = true,    // ファン
-    .hasAirTemp        = true,    // 空気温度（SHT31）
-    .hasAirHumidity    = true,    // 空気湿度（SHT31）
-    .hasHeaterTemp     = true,    // 加熱器温度（温度計）
-    // 自動発行期間：
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
-    // ポータル識別：
     .hardwareVersion   = "1.0",
     .firmwareVersion   = "0.1.0",
     .model             = "DIY Storage Cabinet",
@@ -139,13 +140,8 @@ void loop() {
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自作デバイス：カードはマニフェストが組み立てる
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -189,7 +185,7 @@ pio device monitor -b 115200
 [INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-モニターは開いたままにして、アプリに進みます。
+最後の行が、このステップで必要な状態です：ネットワークはつながっており、紐付けのシークレットはなく、デバイスはアプリからのトークンを待っています。モニターは開いたままにして、アプリに進みます。
 
 ## 9. アプリでWi-Fiに接続し、デバイスを紐付ける
 
@@ -200,6 +196,15 @@ pio device monitor -b 115200
 5. **ペアリングが完了しました**の後、デバイスはポータルとアプリのデバイス一覧に表示されます。
 
 デバイスがすでにネットワーク上にある場合は、すぐに**ペアリング**ステップを開いてください — ウィンドウ上部のチップをタップします。
+
+![アプリのWi-Fiステップ：ネットワーク名とパスワード](../../img/09-cabinet/04-app-wifi.png)
+*アプリの**Wi-Fi**ステップ：ネットワーク情報を無線でデバイスに送ります。*
+
+![ペアリングステップ：アプリがネットワーク上でデバイスを見つけた](../../img/09-cabinet/04-app-pairing.png)
+*アプリの**ペアリング**ステップ：シリアル番号でネットワーク上のデバイスを見つけました。他人のデバイスは使用中として表示されます。*
+
+![「デバイスが紐付けられました」というメッセージ](../../img/09-cabinet/04-app-paired.png)
+*完了：デバイスはアカウントに紐付けられ、まもなく一覧に表示されます。*
 
 ログには紐付けが表示されます：
 
@@ -213,11 +218,20 @@ pio device monitor -b 115200
 
 ## 結果の確認
 
-この段階で、デバイスはポータルでOnlineになっているはずです。センサーのデータはまだありませんが、それで問題ありません。うまくいかない場合：
+この段階で、デバイスはポータルでOnlineになっているはずです。センサーのデータはまだありませんが、それで問題ありません：`Config`はまだセンサーについて何も宣言しておらず、カードに表示するものがないからです。
 
-- アプリがデバイスのネットワーク参加を確認できなかった — パスワードとネットワークが`2.4 GHz`であることを確認してください。パスワードが間違っているとデバイスは再び設定待ちになるので、Wi-Fiステップをやり直します；
+![紐付け直後のポータル上のデバイスカード](../../img/09-cabinet/04-portal-card.png)
+*ポータル上のデバイス：名前、Idle状態、接続アイコン。計測値はありません — 次の章で表示されます。*
+
+`Device DEVICE_…`という名前は工場出荷時のものです。名前の横の鉛筆アイコンでデバイスの名前を変更してください。以降の例では「Storage cabinet」という名前を使います。
+
+うまくいかない場合：
+
+- アプリがデバイスのネットワーク参加を確認できなかった — パスワードとネットワークが`2.4 GHz`であることを確認してください。パスワードが間違っているとデバイスは再び設定待ちになるので、ボードを再起動してWi-Fiステップをやり直します；
+- ネットワーク情報が無線でどうしても渡らない — Webインストーラー [install.idryer.org](https://install.idryer.org) を使って同じことをUSB経由で行ってください；
 - **ペアリング**ステップでアプリがデバイスを見つけられなかった — 電話とデバイスは同じネットワークにあり、ネットワークがデバイスの検出をブロックしていないこと（ゲストネットワークはよくブロックします）；
 - デバイスが再起動する — ESP32の電源を確認してください（起動時の電圧降下はリセットのよくある原因です）；
+- ビルドがエラーで失敗する — コミュニティで質問してください：[Telegram](https://t.me/iDryer)、[Discord](https://discord.gg/jGce5eeHHz)；
 - [電源の間違い](../08-common-mistakes/02-power-mistakes.md)と[コントローラーの間違い](../08-common-mistakes/04-controller-mistakes.md)を参照してください。
 
 ## 次のステップ

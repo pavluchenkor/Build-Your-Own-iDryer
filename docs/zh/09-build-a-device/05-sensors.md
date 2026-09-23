@@ -19,7 +19,7 @@ description: "在 ESP32 上读取 SHT31 气候传感器和加热器温度计：�
 | `s_link.telemetry.airHumidityPct[0]` | 空气湿度，% | `hasAirHumidity` |
 | `s_link.telemetry.heaterTempC[0]` | 加热器温度，°C | `hasHeaterTemp` |
 
-我们已经在[前一步的 Config](04-firmware-start.md) 中包括了所有三个标志。
+这三个标志就在本章的 `Config` 中开启（完整代码见本章末尾）。标志告诉门户和应用设备有这样一个传感器：没有它，卡片上不会出现相应的格子。
 
 ## 规则：传感器代码不应该阻塞 loop()
 
@@ -27,7 +27,7 @@ description: "在 ESP32 上读取 SHT31 气候传感器和加热器温度计：�
 
 ## 步骤 1. SHT31：柜气候
 
-你不需要从头开始编写 SHT31 驱动程序 — 现成的 `Sht31ClimateSensor` 类在 `iDryer-Storage` 示例中。它使用 `robtillaart/SHT31` 库并无阻塞地读取传感器。
+你不需要从头开始编写 SHT31 驱动程序 — 现成的 `Sht31ClimateSensor` 类就在本章的示例 [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet) 中。它使用 `robtillaart/SHT31` 库并无阻塞地读取传感器。
 
 1. 在你的 `platformio.ini` 的 `lib_deps` 中添加 SHT31 库：
 
@@ -36,7 +36,12 @@ description: "在 ESP32 上读取 SHT31 气候传感器和加热器温度计：�
         robtillaart/SHT31 @ ^0.5.0
     ```
 
-2. 从 `iDryer-Storage/src/storage/sensors/` 复制四个文件到你的 `src/` 文件夹：`Sht31ClimateSensor.h`、`Sht31ClimateSensor.cpp`、`IClimateSensor.h` 和 `sensor_reading.h`。
+2. 把驱动的四个文件复制到你的 `src/` 文件夹：
+
+    ```bash
+    git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+    cp ~/byo-idryer/example/09-cabinet/src/{Sht31ClimateSensor.h,Sht31ClimateSensor.cpp,IClimateSensor.h,sensor_reading.h} src/
+    ```
 
 3. 通过 I2C 连接传感器（见[接线图](03-wiring.md)）并在 `src/main.cpp` 中读取它：
 
@@ -71,7 +76,20 @@ void loop() {
 }
 ```
 
-`SensorReading` 结构（字段 `ok`、`temperature`、`humidity`）在 `sensor_reading.h` 中声明。刷入后，门户网站会显示柜温度和湿度 — 这是来自设备的第一个反馈。
+驱动用 `sensor_reading.h` 中的 `SensorReading` 结构返回一次读数快照：
+
+```cpp
+struct SensorReading {
+    float    temperature = NAN;   // °C，无值时为 NAN
+    float    humidity    = NAN;   // % RH，无值时为 NAN
+    float    pressure    = NAN;   // hPa，为将来的传感器预留
+    uint32_t ts_ms       = 0;     // 读取时刻的 millis()
+    bool     ok          = false; // true 表示温度和湿度有效
+    int      err         = 0;     // 错误码，0 — 无错误
+};
+```
+
+刷入后，门户网站会显示柜温度和湿度 — 这是来自设备的第一个反馈。
 
 ## 步骤 2. 温度计：加热器温度
 
@@ -91,7 +109,8 @@ static float readHeaterTempC() {
     int   raw = analogRead(THERM_PIN);          // 0..4095 在 ESP32 上
     float v   = (float)raw / 4095.0f;           // 完整范围的分数
     float r   = SERIES_R * (1.0f - v) / v;      // 温度计电阻，欧
-    // Steinhart–Hart 方程（B 参数）：
+    // Steinhart–Hart 方程的 B 参数形式 — 见维基百科：
+    // https://en.wikipedia.org/wiki/Steinhart%E2%80%93Hart_equation
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
 }
@@ -108,6 +127,37 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 
 万用表温度计检查 — [检查温度计](../06-practical-guides/02-checking-thermistor.md)。
 
+## 步骤 3. 手头没有传感器？演示模式
+
+没有硬件也能走到卡片这一步：读数由柜子模型算出。从同一个示例中复制 `demo_sensors.h` 文件：
+
+```bash
+cp ~/byo-idryer/example/09-cabinet/src/demo_sensors.h src/
+```
+
+并在 `platformio.ini` 中加上构建标志：
+
+```ini
+build_flags =
+    -DDEMO_SENSORS=1
+```
+
+两条分支都藏在一个函数后面，`loop()` 并不知道值从哪里来：
+
+```cpp
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    // 读取 SHT31 和温度计 — 同上
+#endif
+}
+```
+
+模型的表现像真实的柜子：房间温度在 `24 °C` 附近缓慢起伏，打开的加热器让空气升温，关闭后放它冷却，升温时湿度下降。模型从遥测中读取加热功率，因此[加热控制](07-heating-control.md)一章的逻辑能看到响应，磁滞也能正常工作。本节的屏幕截图正是这样做出来的。
+
+正式使用的设备不加这个标志：那时构建的是真实传感器的分支。
+
 ## 本章后 `src/main.cpp` 的完整版本
 
 下面是整个文件。相对于上一章的新行标记为 `// ← 第 5 章`；其余的没有改变。
@@ -118,13 +168,8 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
     #include <iDryer.h>
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // 自制设备：卡片由清单生成
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
-        .hasAirTemp        = true,
-        .hasAirHumidity    = true,
-        .hasHeaterTemp     = true,
         .telemetryPeriodMs = 5000,
         .statusPeriodMs    = 10000,
         .hardwareVersion   = "1.0",
@@ -150,15 +195,14 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 #include <Wire.h>                  // ← 第 5 章
 #include <math.h>                  // ← 第 5 章
 #include "Sht31ClimateSensor.h"    // ← 第 5 章
+#include "demo_sensors.h"    // ← 第 5 章：没有传感器时的读数（-DDEMO_SENSORS=1）
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自制设备：卡片由清单生成
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
+    .hasAirTemp        = true,     // ← 第 5 章
+    .hasAirHumidity    = true,     // ← 第 5 章
+    .hasHeaterTemp     = true,  // ← 第 5 章
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -186,6 +230,23 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← 第 5 章：传感器，或者在 -DDEMO_SENSORS=1 时用柜子模型
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);                 // ← 第 5 章（SDA、SCL — 你的板的引脚）
@@ -198,19 +259,14 @@ void setup() {
 void loop() {
     s_link.loop();
 
-    if (s_climateOk) {                                       // ← 第 5 章
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();     // ← 第 5 章
+    readSensors();   // ← 第 5 章
 }
 ```
 
 ## 检查结果
+
+![门户上的设备页面：读数和图表](../../img/09-cabinet/05-portal-device.png)
+*卡片上的读数和遥测图表。加热器温度在图上是单独的一条线。页面下方的菜单暂时是空的——下一章会处理它。*
 
 在此步骤后，门户网站应显示三个值：
 

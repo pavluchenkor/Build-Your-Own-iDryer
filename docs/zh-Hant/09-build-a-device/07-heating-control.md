@@ -138,6 +138,12 @@ void loop() {
 
 啟動和停止來自門戶和應用程式中的裝置卡片。韌體把它們宣告為卡片 **動作**：核心庫把它們加入 card 清單，門戶和應用程式自行繪製表單和按鈕。程式碼中無需解析指令——核心庫會呼叫你的函式。
 
+![帶啟動表單的卡片](../../img/09-cabinet/07-portal-card.png)
+*卡片由 card 清單組成：左邊是讀數，包括加熱功率和風扇，右邊是帶溫度欄位和啟動按鈕的表單。門戶原本對這個裝置一無所知——全部都來自韌體。*
+
+![應用程式中的同一張卡片](../../img/09-cabinet/07-app-card.png)
+*應用程式中是同樣的內容，也來自同一份清單：讀數、溫度欄位和啟動按鈕。*
+
 溫度欄位的範圍和預設值透過橋接 `card_menu_bridge.h` 取自選單項目 `target_temp`（30–50 °C，45）。使用者輸入的值隨啟動指令送出，不會寫入選單。在第 6 章的選單標頭檔旁邊加入標頭檔：
 
 ```cpp
@@ -206,16 +212,15 @@ card.action("stop", "IDLE", onStop)
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // 沒有感應器時的讀數（-DDEMO_SENSORS=1）
     #include <menu_state.h>                      // ← 第6章：參數（menu.target_temp …）
     #include <menu_bindings.h>                   // ← 第6章：menu_apply_by_bind
     #include <menu_commands.h>                   // ← 第6章：menu_buildFullJson
     #include <local_access/device_publisher.h>   // ← 第6章：publishConfigRaw
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // 自製裝置：卡片由 card 清單組成
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -242,6 +247,23 @@ card.action("stop", "IDLE", onStop)
         float r   = SERIES_R * (1.0f - v) / v;
         float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
         return tK - 273.15f;
+    }
+
+    // 讀數：感應器，或者在 -DDEMO_SENSORS=1 時用櫃子模型
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
     }
 
     // ← 第6章：門戶上的選單
@@ -295,15 +317,7 @@ card.action("stop", "IDLE", onStop)
             publishMenu();
         }
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -312,6 +326,7 @@ card.action("stop", "IDLE", onStop)
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // 沒有感應器時的讀數（-DDEMO_SENSORS=1）
 #include <menu_state.h>
 #include <menu_bindings.h>
 #include <menu_commands.h>
@@ -319,10 +334,10 @@ card.action("stop", "IDLE", onStop)
 #include <card/card_menu_bridge.h>        // ← 第7章
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自製裝置：卡片由 card 清單組成
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
+    .hasHeater         = true,     // ← 第7章
+    .hasFan            = true,        // ← 第7章
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -349,6 +364,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// 讀數：感應器，或者在 -DDEMO_SENSORS=1 時用櫃子模型
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 static bool s_menuPending = false;
@@ -460,15 +492,7 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 
     controlLoop();   // ← 第7章
     applyHeater();   // ← 第7章
@@ -477,6 +501,18 @@ void loop() {
 ```
 
 ## 驗證結果
+
+![剛啟動儲存後的卡片](../../img/09-cabinet/07-portal-session.png)
+*剛啟動時：Storage 模式、目標 45 °C、功率 100 %、風扇開啟，時間開始倒數。*
+
+![加熱三分鐘後的卡片和圖表](../../img/09-cabinet/07-portal-heating.png)
+*三分鐘後：櫃內空氣溫度上升，濕度下降，加熱器達到工作溫度。圖表上可以看到功率如何按滯後開開關關。*
+
+![從應用程式啟動儲存](../../img/09-cabinet/07-app-session.png)
+*儲存也可以從應用程式啟動：出現「停止」按鈕和時間倒數。*
+
+![三分鐘後應用程式中的加熱](../../img/09-cabinet/07-app-heating.png)
+*三分鐘後在應用程式中：45 °C 中的 43.9 °C，濕度從 51 % 降到 33 %。圖表上溫度向上，濕度向下。*
 
 此步驟後：
 

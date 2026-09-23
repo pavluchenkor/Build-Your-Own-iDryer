@@ -18,7 +18,7 @@ Nesta página você monta o dispositivo no gabinete, faz o primeiro aquecimento 
 Requisitos para o gabinete e colocação dos nós — [Projeto de gabinete](../07-3d-printing/05-enclosure-design.md).
 
 !!! warning "Peças plásticas perto do aquecimento"
-    PLA amolece na temperatura que facilmente se encontra perto do aquecedor. Peças perto do calor imprima em material termoresistente. Veja [Materiais termoresistentes](../07-3d-printing/04-heat-resistant-materials.md) e [Por que PLA é uma escolha arriscada](../07-3d-printing/06-why-pla-is-risky.md).
+    PLA amolece na temperatura que facilmente se encontra perto do aquecedor. Peças perto do calor imprima em material termoresistente: ABS, ASA ou PA (náilon). Veja [Materiais termoresistentes](../07-3d-printing/04-heat-resistant-materials.md) e [Por que PLA é uma escolha arriscada](../07-3d-printing/06-why-pla-is-risky.md).
 
 ## Verificação antes de energizar
 
@@ -34,7 +34,7 @@ Como usar multímetro — [Multímetro](../05-tools/02-multimeter.md).
 
 ## Primeiro lançamento
 
-1. Forneça energia apenas ao controlador e sensores (não conecte a carga ainda, se possível).
+1. Forneça energia apenas ao controlador e sensores. Se a fonte de alimentação for uma só para tudo, alimente o controlador separadamente: por USB ou através de um conversor abaixador, e não conecte ainda o fio do aquecedor.
 2. Certifique-se que o dispositivo está Online no portal e mostra temperatura e umidade.
 3. Conecte o aquecedor e ventilador.
 4. Inicie o modo de manutenção de calor no portal e observe.

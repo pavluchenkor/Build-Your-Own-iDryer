@@ -18,7 +18,7 @@ En esta página ensambla el dispositivo en la carcasa, realiza el primer calenta
 Requisitos para la carcasa y la colocación de componentes — [Diseño de carcasa](../07-3d-printing/05-enclosure-design.md).
 
 !!! warning "Piezas impresas cerca del calor"
-    El PLA se ablanda a una temperatura que fácilmente se alcanza cerca del calentador. Las piezas cerca del calor deben imprimirse con materiales resistentes al calor. Consulte [Materiales resistentes al calor](../07-3d-printing/04-heat-resistant-materials.md) y [Por qué PLA es arriesgado](../07-3d-printing/06-why-pla-is-risky.md).
+    El PLA se ablanda a una temperatura que fácilmente se alcanza cerca del calentador. Las piezas cerca del calor deben imprimirse con materiales resistentes al calor: ABS, ASA o PA (nailon). Consulte [Materiales resistentes al calor](../07-3d-printing/04-heat-resistant-materials.md) y [Por qué PLA es arriesgado](../07-3d-printing/06-why-pla-is-risky.md).
 
 ## Verificación antes de aplicar energía
 
@@ -34,7 +34,7 @@ Cómo usar un multímetro — [Multímetro](../05-tools/02-multimeter.md).
 
 ## Primer encendido
 
-1. Suministre energía solo al controlador y los sensores (no conecte la carga aún, si es posible).
+1. Suministre energía solo al controlador y los sensores. Si la fuente de alimentación es única para todo, alimente el controlador por separado: desde USB o mediante un convertidor reductor, y deje sin conectar por ahora el cable del calentador.
 2. Verifique que el dispositivo esté en línea en el portal y muestre temperatura y humedad.
 3. Conecte el calentador y el ventilador.
 4. Inicie el modo de mantenimiento de calor desde el portal y observe.

@@ -30,6 +30,8 @@ menu.yaml → (pio runビルド) → src/menu/内のC++ファイル + NVS + ポ�
 !!! warning "生成されたファイルを編集しないでください"
     `menu_state.*`、`menu_bindings.*`、`menu_ids.h`などのファイルはジェネレーターによって作成されます。`menu.yaml`のみを編集してリビルドします。そうしないと、変更は上書きされます。
 
+    項目の定数名は単純に決まります：`MENU_`にその`id`を大文字にしたものを付けます。項目`target_temp`は`MENU_TARGET_TEMP`、`hysteresis`は`MENU_HYSTERESIS`になります。これらの定数は第7章で必要になります。
+
 ## ステップ1。テンプレートをコピーする
 
 ライブラリにはメニューテンプレートがあります。プロジェクトにコピーします：
@@ -65,7 +67,7 @@ extra_scripts =                     ; ← 追加
     pre:extra_scripts/pre_gen_menu.py
 ```
 
-フックは自動的にパス`lib/idryer-core/menu/menu_gen.py`でジェネレーターを見つけます。ライブラリは第4章で説明されているとおり、`lib/`（シムリンクまたはコピー）を通じて接続される必要があります。
+フックは自動的にパス`lib/idryer-core/menu/menu_gen.py`でジェネレーターを見つけます。ライブラリは第4章で説明されているとおり、`lib/`（シムリンクまたはコピー）を通じて接続される必要があります。ジェネレーターはPlatformIOが自身のPythonで実行するため、別途インストールするものはありません。それでもこのステップでビルドが失敗する場合は、エラーの文面をコミュニティで見せてください：[Telegram](https://t.me/iDryer)、[Discord](https://discord.gg/jGce5eeHHz)。
 
 ## ステップ3。シャフトのパラメーターを説明する
 
@@ -233,12 +235,11 @@ if (s_menuPending) {
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // センサーなしでの読み取り値（-DDEMO_SENSORS=1）
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // 自作デバイス：カードはマニフェストが組み立てる
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -267,6 +268,23 @@ if (s_menuPending) {
         return tK - 273.15f;
     }
 
+    // 読み取り値：センサー、または-DDEMO_SENSORS=1ならシャフトのモデル
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
@@ -279,15 +297,7 @@ if (s_menuPending) {
     void loop() {
         s_link.loop();
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -296,16 +306,15 @@ if (s_menuPending) {
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // センサーなしでの読み取り値（-DDEMO_SENSORS=1）
 #include <menu_state.h>                      // ← 章6：パラメーター（menu.target_temp …）
 #include <menu_bindings.h>                   // ← 章6：menu_apply_by_bind
 #include <menu_commands.h>                   // ← 章6：menu_buildFullJson
 #include <local_access/device_publisher.h>   // ← 章6：publishConfigRaw
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自作デバイス：カードはマニフェストが組み立てる
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -332,6 +341,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// 読み取り値：センサー、または-DDEMO_SENSORS=1ならシャフトのモデル
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 // ← 章6：ポータルのメニュー
@@ -385,19 +411,14 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 }
 ```
 
 ## 結果の確認
+
+![ポータル上のデバイスメニュー](../../img/09-cabinet/06-portal-menu.png)
+*メニューはデバイスから届きました：保管温度とヒステリシス、それぞれの上下限付き。値はここで直接変更でき、デバイスはそれを受け付けて保存し、メニューを再送します。*
 
 フラッシュ後：
 

@@ -19,7 +19,7 @@ description: "ESP32上のSHT31気候センサーと加熱器温度計を読み�
 | `s_link.telemetry.airHumidityPct[0]` | 空気湿度、% | `hasAirHumidity` |
 | `s_link.telemetry.heaterTempC[0]` | 加熱器温度、°C | `hasHeaterTemp` |
 
-これらの3つのフラグはすべて[前のステップのConfigで](04-firmware-start.md)既に含まれています。
+これら3つのフラグは、ここで`Config`に入れます（完全なリストは章末を参照）。フラグは、そのようなセンサーがデバイスにあることをポータルとアプリに伝えます：フラグがなければカード上にセルは表示されません。
 
 ## ルール：センサーコードはloop()をブロックしてはいけません
 
@@ -27,7 +27,7 @@ description: "ESP32上のSHT31気候センサーと加熱器温度計を読み�
 
 ## ステップ1。SHT31：シャフトの気候
 
-SHT31ドライバーをゼロから書く必要はありません。既成のクラス`Sht31ClimateSensor`は例`iDryer-Storage`にあります。それは`robtillaart/SHT31`ライブラリを使用し、ブロッキングなしでセンサーを読みます。
+SHT31ドライバーをゼロから書く必要はありません。既成のクラス`Sht31ClimateSensor`は、この章の例 [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet) にあります。それは`robtillaart/SHT31`ライブラリを使用し、ブロッキングなしでセンサーを読みます。
 
 1. `platformio.ini`の`lib_deps`にSHT31ライブラリを追加します：
 
@@ -36,7 +36,12 @@ SHT31ドライバーをゼロから書く必要はありません。既成のク
         robtillaart/SHT31 @ ^0.5.0
     ```
 
-2. `iDryer-Storage/src/storage/sensors/`から、`src/`フォルダーに4つのファイルをコピーします：`Sht31ClimateSensor.h`、`Sht31ClimateSensor.cpp`、`IClimateSensor.h`、`sensor_reading.h`。
+2. ドライバーの4つのファイルを`src/`フォルダーにコピーします：
+
+    ```bash
+    git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+    cp ~/byo-idryer/example/09-cabinet/src/{Sht31ClimateSensor.h,Sht31ClimateSensor.cpp,IClimateSensor.h,sensor_reading.h} src/
+    ```
 
 3. I2Cを通じてセンサーを接続し（[接続図](03-wiring.md)を参照）、`src/main.cpp`で読み込みます：
 
@@ -71,7 +76,20 @@ void loop() {
 }
 ```
 
-構造体`SensorReading`（フィールド`ok`、`temperature`、`humidity`）は`sensor_reading.h`で宣言されます。フラッシュ後、ポータルにシャフトの温度と湿度が表示されます。これはデバイスからの最初のフィードバックです。
+ドライバーは1回分の読み取り値を、`sensor_reading.h`の`SensorReading`構造体で返します：
+
+```cpp
+struct SensorReading {
+    float    temperature = NAN;   // °C、値がなければNAN
+    float    humidity    = NAN;   // % RH、値がなければNAN
+    float    pressure    = NAN;   // hPa、将来のセンサー用
+    uint32_t ts_ms       = 0;     // 読み取り時点のmillis()
+    bool     ok          = false; // 温度と湿度が有効ならtrue
+    int      err         = 0;     // エラーコード、0はエラーなし
+};
+```
+
+フラッシュ後、ポータルにシャフトの温度と湿度が表示されます。これはデバイスからの最初のフィードバックです。
 
 ## ステップ2。温度計：加熱器の温度
 
@@ -91,7 +109,8 @@ static float readHeaterTempC() {
     int   raw = analogRead(THERM_PIN);          // ESP32上の0..4095
     float v   = (float)raw / 4095.0f;           // フルスケールの一部
     float r   = SERIES_R * (1.0f - v) / v;      // 温度計の抵抗、オーム
-    // スタインハート-ハート方程式（Bパラメーター）：
+    // スタインハート–ハート方程式のBパラメーター形式 — Wikipedia参照：
+    // https://en.wikipedia.org/wiki/Steinhart%E2%80%93Hart_equation
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
 }
@@ -108,6 +127,37 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 
 マルチメーターでの温度計チェック - [温度計チェック](../06-practical-guides/02-checking-thermistor.md)。
 
+## ステップ3。センサーが手元にない場合：デモモード
+
+ハードウェアなしでもカードまでの道のりを進められます：読み取り値はシャフトのモデルが計算します。同じ例から`demo_sensors.h`ファイルをコピーしてください：
+
+```bash
+cp ~/byo-idryer/example/09-cabinet/src/demo_sensors.h src/
+```
+
+そして`platformio.ini`にビルドフラグを追加します：
+
+```ini
+build_flags =
+    -DDEMO_SENSORS=1
+```
+
+両方の分岐は1つの関数の中に隠れており、`loop()`は値がどこから来たのかを知りません：
+
+```cpp
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    // SHT31と温度計の読み取り — 上記のとおり
+#endif
+}
+```
+
+モデルは本物のシャフトのように振る舞います：室温は`24 °C`前後でゆっくり揺れ、加熱器がオンなら空気は温まり、オフなら冷めていき、加熱時には湿度が下がります。モデルは加熱の出力をテレメトリーから読むため、[加熱制御](07-heating-control.md)の章のロジックは応答を見ることができ、ヒステリシスが機能します。このセクションのスクリーンショットは、まさにこの方法で撮影されたものです。
+
+実際に動作させるデバイスではこのフラグは設定しません。その場合は本物のセンサーを使う分岐がビルドされます。
+
 ## この章の後の完全な`src/main.cpp`
 
 以下は完全なファイルです。前の章に対する新しい行は`// ← 章5`でマークされています。残りは変わりませんでした。
@@ -118,13 +168,8 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
     #include <iDryer.h>
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // 自作デバイス：カードはマニフェストが組み立てる
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
-        .hasAirTemp        = true,
-        .hasAirHumidity    = true,
-        .hasHeaterTemp     = true,
         .telemetryPeriodMs = 5000,
         .statusPeriodMs    = 10000,
         .hardwareVersion   = "1.0",
@@ -150,15 +195,14 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 #include <Wire.h>                  // ← 章5
 #include <math.h>                  // ← 章5
 #include "Sht31ClimateSensor.h"    // ← 章5
+#include "demo_sensors.h"    // ← 章5：センサーなしでの読み取り値（-DDEMO_SENSORS=1）
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自作デバイス：カードはマニフェストが組み立てる
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
+    .hasAirTemp        = true,     // ← 章5
+    .hasAirHumidity    = true,     // ← 章5
+    .hasHeaterTemp     = true,  // ← 章5
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -186,6 +230,23 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← 章5：センサー、または-DDEMO_SENSORS=1ならシャフトのモデル
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);                 // ← 章5（SDA、SCL - ボードのピン）
@@ -198,19 +259,14 @@ void setup() {
 void loop() {
     s_link.loop();
 
-    if (s_climateOk) {                                       // ← 章5
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();     // ← 章5
+    readSensors();   // ← 章5
 }
 ```
 
 ## 結果の確認
+
+![ポータルのデバイスページ：読み取り値とグラフ](../../img/09-cabinet/05-portal-device.png)
+*カード上の読み取り値とテレメトリーのグラフ。加熱器の温度はグラフ上で別の線として表示されます。ページ下部のメニューはまだ空です — 次の章で扱います。*
 
 このステップの後、ポータルに3つの値を表示する必要があります：
 

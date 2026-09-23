@@ -30,6 +30,8 @@ menu.yaml → (сборка pio run) → C++-файлы в src/menu/ + NVS + JSO
 !!! warning "Не редактируйте сгенерированные файлы"
     Файлы `menu_state.*`, `menu_bindings.*`, `menu_ids.h` и другие создаёт генератор. Правьте только `menu.yaml` и пересобирайте — иначе ваши изменения затрутся.
 
+    Имя константы пункта складывается просто: `MENU_` плюс его `id` заглавными. Пункт `target_temp` даёт `MENU_TARGET_TEMP`, `hysteresis` — `MENU_HYSTERESIS`. Эти константы понадобятся в главе 7.
+
 ## Шаг 1. Скопируйте шаблон
 
 В библиотеке есть шаблон меню. Скопируйте его в проект:
@@ -65,7 +67,7 @@ extra_scripts =                     ; ← добавили
     pre:extra_scripts/pre_gen_menu.py
 ```
 
-Хук сам найдёт генератор по пути `lib/idryer-core/menu/menu_gen.py`, поэтому библиотека должна быть подключена через `lib/` (симлинк или копия), как описано в главе 4.
+Хук сам найдёт генератор по пути `lib/idryer-core/menu/menu_gen.py`, поэтому библиотека должна быть подключена через `lib/` (симлинк или копия), как описано в главе 4. Генератор запускает PlatformIO своим Python — отдельно ставить ничего не нужно. Если сборка всё же падает на этом шаге, покажите текст ошибки в сообществе: [Telegram](https://t.me/iDryer), [Discord](https://discord.gg/jGce5eeHHz).
 
 ## Шаг 3. Опишите параметры шкафа
 
@@ -233,12 +235,11 @@ if (s_menuPending) {
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // показания без датчиков (-DDEMO_SENSORS=1)
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // своё устройство: карточку собирает манифест
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -267,6 +268,23 @@ if (s_menuPending) {
         return tK - 273.15f;
     }
 
+    // Показания: датчики или, с -DDEMO_SENSORS=1, модель шкафа
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
@@ -279,15 +297,7 @@ if (s_menuPending) {
     void loop() {
         s_link.loop();
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -296,16 +306,15 @@ if (s_menuPending) {
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // показания без датчиков (-DDEMO_SENSORS=1)
 #include <menu_state.h>                      // ← глава 6: параметры (menu.target_temp …)
 #include <menu_bindings.h>                   // ← глава 6: menu_apply_by_bind
 #include <menu_commands.h>                   // ← глава 6: menu_buildFullJson
 #include <local_access/device_publisher.h>   // ← глава 6: publishConfigRaw
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // своё устройство: карточку собирает манифест
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -332,6 +341,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// Показания: датчики или, с -DDEMO_SENSORS=1, модель шкафа
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 // ← глава 6: меню на портале
@@ -385,19 +411,14 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 }
 ```
 
 ## Проверка результата
+
+![Меню устройства на портале](../../img/09-cabinet/06-portal-menu.png)
+*Меню пришло с устройства: температура хранения и гистерезис с их пределами. Значение можно поменять прямо здесь — устройство примет его, сохранит и пришлёт меню заново.*
 
 После прошивки:
 

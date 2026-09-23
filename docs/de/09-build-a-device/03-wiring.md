@@ -8,7 +8,7 @@ description: "ESP32-Pin-Belegung für einen selbstgebauten Schrank: SHT31 über 
 Diese Seite zeigt, wie Sie die Komponenten um den ESP32 verbinden. Zunächst eine allgemeine Pin-Belegungstabelle, dann die Verbindung jedes Knotens und die Regeln für die Hochspannungsverdrahtung.
 
 !!! warning "Überprüfen Sie zunächst die Pin-Belegung Ihrer Platine"
-    Die unten angegebenen Pin-Nummern sind ein Beispiel. Bei verschiedenen ESP32-C3- und ESP32-S3-Platinen sind die Nummerierung und Anordnung der Pins unterschiedlich. Überprüfen Sie vor dem Zusammenbau die Pin-Belegung Ihrer spezifischen Platine. Nicht alle Pins können frei verwendet werden: Einige sind für das Booten, Flash oder USB reserviert.
+    Die unten angegebenen Pin-Nummern sind ein Beispiel. Bei verschiedenen ESP32-C3- und ESP32-S3-Platinen sind die Nummerierung und Anordnung der Pins unterschiedlich. Überprüfen Sie vor dem Zusammenbau die Pin-Belegung genau Ihres Entwicklungsboards: bei DevKit und Super Mini ist sie vom Hersteller veröffentlicht und in der Platinenbeschreibung zu finden. Nicht alle Pins können frei verwendet werden: Einige sind für das Booten, Flash oder USB reserviert.
 
 ## Pin-Belegungstabelle (Beispiel)
 

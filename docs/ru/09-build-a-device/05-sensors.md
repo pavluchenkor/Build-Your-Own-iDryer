@@ -19,7 +19,7 @@ description: "Чтение датчика климата SHT31 и термист
 | `s_link.telemetry.airHumidityPct[0]` | влажность воздуха, % | `hasAirHumidity` |
 | `s_link.telemetry.heaterTempC[0]` | температура нагревателя, °C | `hasHeaterTemp` |
 
-Все три флага мы уже включили в [Config на предыдущем шаге](04-firmware-start.md).
+Эти три флага включаются здесь же, в `Config` (см. полный листинг в конце главы). Флаг говорит порталу и приложению, что у устройства есть такой датчик: без него ячейка на карточке не появится.
 
 ## Правило: код датчика не должен блокировать loop()
 
@@ -27,7 +27,7 @@ description: "Чтение датчика климата SHT31 и термист
 
 ## Шаг 1. SHT31: климат шкафа
 
-Драйвер SHT31 писать с нуля не нужно — готовый класс `Sht31ClimateSensor` есть в примере `iDryer-Storage`. Он использует библиотеку `robtillaart/SHT31` и читает датчик без блокировки.
+Драйвер SHT31 писать с нуля не нужно — готовый класс `Sht31ClimateSensor` лежит в примере этой главы, [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet). Он использует библиотеку `robtillaart/SHT31` и читает датчик без блокировки.
 
 1. Добавьте библиотеку SHT31 в `lib_deps` своего `platformio.ini`:
 
@@ -36,7 +36,12 @@ description: "Чтение датчика климата SHT31 и термист
         robtillaart/SHT31 @ ^0.5.0
     ```
 
-2. Скопируйте в свою папку `src/` четыре файла из `iDryer-Storage/src/storage/sensors/`: `Sht31ClimateSensor.h`, `Sht31ClimateSensor.cpp`, `IClimateSensor.h` и `sensor_reading.h`.
+2. Скопируйте в свою папку `src/` четыре файла драйвера:
+
+    ```bash
+    git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+    cp ~/byo-idryer/example/09-cabinet/src/{Sht31ClimateSensor.h,Sht31ClimateSensor.cpp,IClimateSensor.h,sensor_reading.h} src/
+    ```
 
 3. Подключите датчик по I2C (см. [Схему подключения](03-wiring.md)) и прочитайте его в `src/main.cpp`:
 
@@ -71,11 +76,24 @@ void loop() {
 }
 ```
 
-Структура `SensorReading` (поля `ok`, `temperature`, `humidity`) объявлена в `sensor_reading.h`. После прошивки на портале появятся температура и влажность шкафа — это первая обратная связь от устройства.
+Один снимок показаний драйвер отдаёт структурой `SensorReading` из `sensor_reading.h`:
+
+```cpp
+struct SensorReading {
+    float    temperature = NAN;   // °C, NAN если нет значения
+    float    humidity    = NAN;   // % RH, NAN если нет значения
+    float    pressure    = NAN;   // гПа, под будущие датчики
+    uint32_t ts_ms       = 0;     // millis() на момент чтения
+    bool     ok          = false; // true, если температура и влажность годные
+    int      err         = 0;     // код ошибки, 0 — нет ошибки
+};
+```
+
+После прошивки на портале появятся температура и влажность шкафа — это первая обратная связь от устройства.
 
 ## Шаг 2. Термистор: температура нагревателя
 
-Готового класса термистора для ESP32 у меня нет, поэтому читаем пишем сами прямо в `src/main.cpp`. Термистор подключён к выводу АЦП через преобразователь напряжения (см. [Схему подключения](03-wiring.md)): контроллер измеряет напряжение в средней точке, по нему высчитывается сопротивление термистора, а затем — температуры.
+Готового класса термистора для ESP32 у меня нет, поэтому чтение пишем сами прямо в `src/main.cpp`. Термистор подключён к выводу АЦП через преобразователь напряжения (см. [Схему подключения](03-wiring.md)): контроллер измеряет напряжение в средней точке, по нему высчитывается сопротивление термистора, а затем — температуры.
 
 ```cpp
 #include <math.h>
@@ -91,7 +109,8 @@ static float readHeaterTempC() {
     int   raw = analogRead(THERM_PIN);          // 0..4095 на ESP32
     float v   = (float)raw / 4095.0f;           // доля от полной шкалы
     float r   = SERIES_R * (1.0f - v) / v;      // сопротивление термистора, Ом
-    // Уравнение Стейнхарта–Харта (B-параметр):
+    // Уравнение Стейнхарта–Харта в форме B-параметра — см. Википедию:
+    // https://ru.wikipedia.org/wiki/Уравнение_Стейнхарта_—_Харта
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
 }
@@ -108,6 +127,37 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 
 Проверка термистора мультиметром — [Проверка термистора](../06-practical-guides/02-checking-thermistor.md).
 
+## Шаг 3. Нет датчиков под рукой? Демо-режим
+
+Пройти путь до карточки можно и без железа: показания посчитает модель шкафа. Скопируйте файл `demo_sensors.h` из того же примера:
+
+```bash
+cp ~/byo-idryer/example/09-cabinet/src/demo_sensors.h src/
+```
+
+и добавьте в `platformio.ini` флаг сборки:
+
+```ini
+build_flags =
+    -DDEMO_SENSORS=1
+```
+
+Обе ветки спрятаны за одной функцией, и `loop()` не знает, откуда пришли значения:
+
+```cpp
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    // чтение SHT31 и термистора — как выше
+#endif
+}
+```
+
+Модель ведёт себя как настоящий шкаф: комната медленно колеблется около `24 °C`, включённый нагреватель греет воздух, выключенный даёт остыть, при нагреве падает влажность. Мощность нагрева модель читает из телеметрии, поэтому логика из главы [Управление нагревом](07-heating-control.md) видит отклик и гистерезис работает. Снимки экрана в этом разделе сделаны именно так.
+
+Для рабочего устройства флаг не ставят: тогда собирается ветка с настоящими датчиками.
+
 ## Полный `src/main.cpp` после этой главы
 
 Ниже — весь файл целиком. Новые строки относительно прошлой главы помечены `// ← глава 5`; остальное не менялось.
@@ -118,13 +168,8 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
     #include <iDryer.h>
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // своё устройство: карточку собирает манифест
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
-        .hasAirTemp        = true,
-        .hasAirHumidity    = true,
-        .hasHeaterTemp     = true,
         .telemetryPeriodMs = 5000,
         .statusPeriodMs    = 10000,
         .hardwareVersion   = "1.0",
@@ -150,15 +195,14 @@ s_link.telemetry.heaterTempC[0] = readHeaterTempC();
 #include <Wire.h>                  // ← глава 5
 #include <math.h>                  // ← глава 5
 #include "Sht31ClimateSensor.h"    // ← глава 5
+#include "demo_sensors.h"    // ← глава 5: показания без датчиков (-DDEMO_SENSORS=1)
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // своё устройство: карточку собирает манифест
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
+    .hasAirTemp        = true,     // ← глава 5
+    .hasAirHumidity    = true,     // ← глава 5
+    .hasHeaterTemp     = true,  // ← глава 5
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -186,6 +230,23 @@ static float readHeaterTempC() {
     return tK - 273.15f;
 }
 
+// ← глава 5: датчики или, с -DDEMO_SENSORS=1, модель шкафа
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
+}
+
 void setup() {
     Serial.begin(115200);
     Wire.begin(8, 9);                 // ← глава 5  (SDA, SCL — выводы вашей платы)
@@ -198,19 +259,14 @@ void setup() {
 void loop() {
     s_link.loop();
 
-    if (s_climateOk) {                                       // ← глава 5
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();     // ← глава 5
+    readSensors();   // ← глава 5
 }
 ```
 
 ## Проверка результата
+
+![Страница устройства на портале: показания и график](../../img/09-cabinet/05-portal-device.png)
+*Показания на карточке и график телеметрии. Температура нагревателя идёт отдельной линией на графике. Меню внизу страницы пока пустое — им займётся следующая глава.*
 
 После этого шага на портале должны отображаться три величины:
 

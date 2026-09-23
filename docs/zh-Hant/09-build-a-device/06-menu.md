@@ -30,6 +30,8 @@ menu.yaml → (pio run構建) → src/menu/中的C++檔案 + NVS + 門戶用JSON
 !!! warning "不要編輯生成的檔案"
     生成器建立`menu_state.*`、`menu_bindings.*`、`menu_ids.h`等檔案。只編輯`menu.yaml`並重新構建——否則你的更改將被抹去。
 
+    項目常數的名稱組成很簡單：`MENU_`加上它的`id`轉成大寫。項目`target_temp`得到`MENU_TARGET_TEMP`，`hysteresis`得到`MENU_HYSTERESIS`。這些常數在第7章會用到。
+
 ## 步驟1。複製範本
 
 函式庫中有菜單範本。將其複製到項目：
@@ -65,7 +67,7 @@ extra_scripts =                     ; ← 新增
     pre:extra_scripts/pre_gen_menu.py
 ```
 
-Hook會自動在`lib/idryer-core/menu/menu_gen.py`路徑中找到生成器，所以函式庫應透過`lib/`（符號連結或複本）連接，如第4章所述。
+Hook會自動在`lib/idryer-core/menu/menu_gen.py`路徑中找到生成器，所以函式庫應透過`lib/`（符號連結或複本）連接，如第4章所述。生成器由PlatformIO用它自己的Python執行——不需要另外安裝任何東西。如果建置仍在這一步失敗，把錯誤文字貼到社群提問：[Telegram](https://t.me/iDryer)、[Discord](https://discord.gg/jGce5eeHHz)。
 
 ## 步驟3。描述櫃的參數
 
@@ -233,12 +235,11 @@ if (s_menuPending) {
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // 沒有感應器時的讀數（-DDEMO_SENSORS=1）
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // 自製裝置：卡片由 card 清單組成
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -267,6 +268,23 @@ if (s_menuPending) {
         return tK - 273.15f;
     }
 
+    // 讀數：感應器，或者在 -DDEMO_SENSORS=1 時用櫃子模型
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
+    }
+
     void setup() {
         Serial.begin(115200);
         Wire.begin(8, 9);
@@ -279,15 +297,7 @@ if (s_menuPending) {
     void loop() {
         s_link.loop();
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -296,16 +306,15 @@ if (s_menuPending) {
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // 沒有感應器時的讀數（-DDEMO_SENSORS=1）
 #include <menu_state.h>                      // ← 第6章：參數（menu.target_temp …）
 #include <menu_bindings.h>                   // ← 第6章：menu_apply_by_bind
 #include <menu_commands.h>                   // ← 第6章：menu_buildFullJson
 #include <local_access/device_publisher.h>   // ← 第6章：publishConfigRaw
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自製裝置：卡片由 card 清單組成
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -332,6 +341,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// 讀數：感應器，或者在 -DDEMO_SENSORS=1 時用櫃子模型
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 // ← 第6章：門戶上的選單
@@ -385,19 +411,14 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 }
 ```
 
 ## 驗證結果
+
+![門戶上的裝置選單](../../img/09-cabinet/06-portal-menu.png)
+*選單來自裝置：儲存溫度和滯後，以及它們的上下限。數值可以直接在這裡修改——裝置接受、儲存並重新送出選單。*
 
 刷新後：
 

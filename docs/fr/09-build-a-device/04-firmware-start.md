@@ -15,8 +15,10 @@ Vous aurez besoin de :
 
 - VS Code avec l'extension PlatformIO ;
 - Un câble USB ;
-- Un réseau Wi-Fi `2.4 GHz` (ESP32 ne fonctionne pas avec les réseaux uniquement `5 GHz`).
-- un smartphone avec l'application iDryer connectée à votre compte du portail iDryer : c'est par elle que l'appareil reçoit le réseau Wi-Fi et est associé au compte.
+- Un réseau Wi-Fi `2.4 GHz` (ESP32 ne fonctionne pas avec les réseaux uniquement `5 GHz`) ;
+- un smartphone avec l'application iDryer ([App Store](https://apps.apple.com/app/idryer/id6760609044), [Google Play](https://play.google.com/store/apps/details?id=org.idryer.mobile)), connectée à votre compte du portail iDryer : c'est par elle que l'appareil reçoit le réseau Wi-Fi et est associé au compte ;
+- la bibliothèque du cœur [idryer-core](https://github.com/pavluchenkor/idryer-core) ;
+- le projet prêt à l'emploi de ce chapitre — [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet) dans le dépôt du manuel : c'est de là que viennent le pilote du capteur et les autres fichiers qu'il est proposé de copier par la suite.
 
 Ce qu'est le firmware du contrôleur et comment il arrive sur la carte — [Flashage du contrôleur](../02-controllers/11-flashing-controller.md).
 
@@ -38,14 +40,21 @@ Tous les fragments de code ci-dessous vont exactement dans ces fichiers — chaq
 Mettez la bibliothèque `idryer-core` dans `lib/` — PlatformIO trouve automatiquement les bibliothèques là. La façon la plus simple est de faire un lien symbolique vers la bibliothèque téléchargée :
 
 ```bash
-ln -s /chemin/vers/idryer-core lib/idryer-core
+git clone https://github.com/pavluchenkor/idryer-core.git ~/idryer-core
+ln -s ~/idryer-core lib/idryer-core
 ```
+
+Au lieu d'un lien symbolique, vous pouvez simplement copier le dossier de la bibliothèque dans `lib/idryer-core` — cela fonctionne pareil.
 
 Ceci est également requis pour la génération du menu (chapitre 6) — le hook cherche le générateur à l'intérieur de `lib/idryer-core/`.
 
 ## 3. Le Wi-Fi et l'association ne sont pas dans le code
 
 Le firmware ne contient ni le mot de passe du réseau ni les données du compte. Au premier démarrage, l'appareil n'a pas de Wi-Fi et attend des réglages : l'application iDryer les envoie par les ondes (ESPTouch), puis associe l'appareil à votre compte avec un jeton d'association à usage unique. Le core fait tout cela dans `s_link.begin()` et `s_link.loop()` ; il vous reste à suivre les étapes de l'application — section 9.
+
+**Comment le réseau arrive dans l'appareil.** Une carte sans réseau enregistré écoute les ondes, comme un récepteur non réglé sur une station. Pendant ce temps, le téléphone « tapote » le nom du réseau et le mot de passe dans l'air — à peu près comme en morse, mais avec des paquets Wi-Fi. La carte capte cette émission, rejoint le réseau et s'y connecte ensuite d'elle-même à chaque mise sous tension. Aucune broche ni aucun fil supplémentaire n'est nécessaire : l'antenne d'origine de la carte s'en charge, cela démarre tout seul tant qu'il n'y a pas de réseau et dure jusqu'à 90 secondes.
+
+Si la transmission par les ondes échoue, il existe une voie filaire : l'installateur web [install.idryer.org](https://install.idryer.org) transmet à la carte le réseau et le jeton d'association par l'USB — la même chose que fait l'application, mais par câble. Un simple redémarrage de la carte aide aussi : ensuite, elle attend de nouveau les réglages.
 
 ## 4. Configurez platformio.ini
 
@@ -87,18 +96,10 @@ Pour un armoire chauffée, au début de `src/main.cpp`
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // appareil personnalisé : la carte est construite par le manifeste
     .unitsCount        = 1,
-    // Périphériques :
-    .hasHeater         = true,    // chauffage contrôlable
-    .hasFan            = true,    // ventilateur
-    .hasAirTemp        = true,    // température de l'air (SHT31)
-    .hasAirHumidity    = true,    // humidité de l'air (SHT31)
-    .hasHeaterTemp     = true,    // température du chauffage (thermistance)
-    // Périodes de publication automatique :
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
-    // Identification sur le portail :
     .hardwareVersion   = "1.0",
     .firmwareVersion   = "0.1.0",
     .model             = "DIY Storage Cabinet",
@@ -139,13 +140,8 @@ Prenez les deux blocs ci-dessus dans un seul fichier — c'est tout `src/main.cp
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // appareil personnalisé : la carte est construite par le manifeste
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -189,7 +185,7 @@ Tant que l'appareil n'a pas de Wi-Fi, le journal reste muet : le core réserve l
 [INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-Laissez le moniteur ouvert et passez à l'application.
+La dernière ligne est exactement ce qu'il faut à cette étape : le réseau est là, il n'y a pas de secret d'association, l'appareil attend le jeton de l'application. Laissez le moniteur ouvert et passez à l'application.
 
 ## 9. Connectez le Wi-Fi et associez l'appareil dans l'application
 
@@ -200,6 +196,15 @@ Laissez le moniteur ouvert et passez à l'application.
 5. Après **Appareil associé**, l'appareil apparaît dans la liste des appareils du portail et de l'application.
 
 Si l'appareil est déjà sur le réseau, ouvrez directement l'étape **Association** — touchez sa puce en haut de la fenêtre.
+
+![Étape Wi-Fi dans l'application : nom du réseau et mot de passe](../../img/09-cabinet/04-app-wifi.png)
+*Étape **Wi-Fi** : l'application transmet le réseau à l'appareil par les ondes.*
+
+![Étape d'association : l'application a trouvé l'appareil sur le réseau](../../img/09-cabinet/04-app-pairing.png)
+*Étape **Association** : l'application a trouvé l'appareil sur le réseau grâce à son numéro de série. Les appareils appartenant à d'autres sont marqués comme occupés.*
+
+![Message « appareil associé »](../../img/09-cabinet/04-app-paired.png)
+*C'est fait : l'appareil est associé au compte et va apparaître dans la liste.*
 
 Le journal montre l'association :
 
@@ -213,11 +218,20 @@ Le journal montre l'association :
 
 ## Vérification du résultat
 
-À ce stade, l'appareil doit être Online sur le portail. Il n'y a pas encore de données de capteurs — c'est normal. Si quelque chose s'est mal passé :
+À ce stade, l'appareil doit être Online sur le portail. Il n'y a pas encore de données de capteurs — c'est normal : le `Config` n'en a encore rien déclaré, et la carte n'a rien à afficher.
 
-- l'application n'a pas vu l'appareil rejoindre le réseau — vérifiez le mot de passe et que le réseau est en `2.4 GHz` ; avec un mauvais mot de passe, l'appareil attend de nouveau les réglages, refaites l'étape Wi-Fi ;
+![Carte de l'appareil sur le portail juste après l'association](../../img/09-cabinet/04-portal-card.png)
+*L'appareil sur le portail : nom, état Idle, icône de liaison. Pas de relevés — ils apparaîtront au chapitre suivant.*
+
+Le nom `Device DEVICE_…` est celui d'usine. Renommez l'appareil avec le crayon à côté du nom : dans la suite des exemples, il s'appelle « Storage cabinet ».
+
+Si quelque chose s'est mal passé :
+
+- l'application n'a pas vu l'appareil rejoindre le réseau — vérifiez le mot de passe et que le réseau est en `2.4 GHz` ; avec un mauvais mot de passe, l'appareil attend de nouveau les réglages, redémarrez la carte et refaites l'étape Wi-Fi ;
+- le réseau ne passe toujours pas par les ondes — faites la même chose par l'USB avec l'installateur web [install.idryer.org](https://install.idryer.org) ;
 - à l'étape **Association**, l'application n'a pas trouvé l'appareil — le téléphone et l'appareil doivent être sur le même réseau, et le réseau ne doit pas bloquer la découverte d'appareils (les réseaux invités le font souvent) ;
 - l'appareil redémarre — vérifiez l'alimentation de l'ESP32 (les chutes de tension au démarrage sont une cause fréquente de redémarrages) ;
+- la compilation échoue avec une erreur — demandez à la communauté : [Telegram](https://t.me/iDryer), [Discord](https://discord.gg/jGce5eeHHz) ;
 - voir [Erreurs d'alimentation](../08-common-mistakes/02-power-mistakes.md) et [Erreurs de contrôleur](../08-common-mistakes/04-controller-mistakes.md).
 
 ## Prochaines étapes

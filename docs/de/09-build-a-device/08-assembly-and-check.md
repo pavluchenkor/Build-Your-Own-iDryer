@@ -18,7 +18,7 @@ Auf dieser Seite bauen Sie das Gerät in das Gehäuse ein, führen die erste kon
 Anforderungen an Gehäuse und Anordnung der Baugruppen – [Gehäusedesign](../07-3d-printing/05-enclosure-design.md).
 
 !!! warning "Gedruckte Teile in der Nähe von Wärmequellen"
-    PLA wird bei Temperaturen weich, die leicht in der Nähe des Heizers auftreten. Teile in der Nähe von Wärme sollten aus hitzebeständigem Material gedruckt werden. Siehe [Hitzebeständige Materialien](../07-3d-printing/04-heat-resistant-materials.md) und [Warum PLA riskant ist](../07-3d-printing/06-why-pla-is-risky.md).
+    PLA wird bei Temperaturen weich, die leicht in der Nähe des Heizers auftreten. Teile in der Nähe von Wärme sollten aus hitzebeständigem Material gedruckt werden: ABS, ASA oder PA (Nylon). Siehe [Hitzebeständige Materialien](../07-3d-printing/04-heat-resistant-materials.md) und [Warum PLA riskant ist](../07-3d-printing/06-why-pla-is-risky.md).
 
 ## Überprüfung vor Stromversorgung
 
@@ -34,7 +34,7 @@ Zur Verwendung eines Multimeters – [Multimeter](../05-tools/02-multimeter.md).
 
 ## Erster Start
 
-1. Versorgen Sie zunächst nur den Regler und die Sensoren mit Strom (schließen Sie die Last noch nicht an, falls möglich).
+1. Versorgen Sie zunächst nur den Regler und die Sensoren mit Strom. Wenn ein einziges Netzteil alles versorgt, versorgen Sie den Regler separat: über USB oder einen Abwärtswandler, und schließen Sie die Leitung des Heizers noch nicht an.
 2. Stellen Sie sicher, dass das Gerät online auf dem Portal angezeigt wird und Temperatur und Luftfeuchtigkeit anzeigt.
 3. Verbinden Sie den Heizer und den Lüfter.
 4. Starten Sie den Wärmehaltmodus vom Portal aus und beobachten Sie.

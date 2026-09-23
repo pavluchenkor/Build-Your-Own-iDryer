@@ -15,8 +15,10 @@ You will need:
 
 - VS Code with PlatformIO extension;
 - USB cable;
-- Wi-Fi network `2.4 GHz` (ESP32 does not work with `5 GHz` only networks).
-- a smartphone with the iDryer app, signed in to your iDryer portal account: it gives the device the Wi-Fi network and links it to the account.
+- Wi-Fi network `2.4 GHz` (ESP32 does not work with `5 GHz` only networks);
+- a smartphone with the iDryer app ([App Store](https://apps.apple.com/app/idryer/id6760609044), [Google Play](https://play.google.com/store/apps/details?id=org.idryer.mobile)), signed in to your iDryer portal account: it gives the device the Wi-Fi network and links it to the account;
+- the core library [idryer-core](https://github.com/pavluchenkor/idryer-core);
+- the ready-made project of this chapter — [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet) in the tutorial repository: it is the source of the sensor driver and the other files you will be asked to copy later.
 
 For information on what controller firmware is and how it gets into the board — see [Controller firmware](../02-controllers/11-flashing-controller.md).
 
@@ -38,14 +40,21 @@ All code fragments below go into these specific files — each step indicates wh
 Place the `idryer-core` library in `lib/` — PlatformIO automatically finds libraries there. The easiest way is to create a symlink to the downloaded library:
 
 ```bash
-ln -s /path/to/idryer-core lib/idryer-core
+git clone https://github.com/pavluchenkor/idryer-core.git ~/idryer-core
+ln -s ~/idryer-core lib/idryer-core
 ```
+
+Instead of a symlink you can simply copy the library folder into `lib/idryer-core` — it works the same way.
 
 This is also required for menu generation (chapter 6) — the hook looks for the generator inside `lib/idryer-core/`.
 
 ## 3. Wi-Fi and pairing are not in the code
 
 The firmware contains neither the network password nor account data. On first start the device has no Wi-Fi and waits for settings: the iDryer app sends them over the air (ESPTouch) and then links the device to your account with a one-time pairing token. The core does all of this inside `s_link.begin()` and `s_link.loop()`, you only go through the steps in the app — section 9.
+
+**How the network gets into the device.** A board with no saved network listens to the air, like a receiver not tuned to a station. Meanwhile the phone "taps out" the network name and password into the air — much like Morse code, only with Wi-Fi packets. The board catches this transmission, joins the network and from then on connects to it by itself at every power-on. No extra pins or wires are needed for this: it uses the board's own antenna, turns on by itself while there is no network, and lasts up to 90 seconds.
+
+If it did not work over the air, there is a wired path: the web installer [install.idryer.org](https://install.idryer.org) passes the network and the pairing token to the board over USB — the same thing the app does, only through a cable. A plain reboot of the board also helps: after it the board waits for settings again.
 
 ## 4. Configure platformio.ini
 
@@ -87,18 +96,10 @@ For a heated cabinet, add to the beginning of `src/main.cpp`:
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // your own device: the card is built by the manifest
     .unitsCount        = 1,
-    // Peripherals:
-    .hasHeater         = true,    // controlled heater
-    .hasFan            = true,    // fan
-    .hasAirTemp        = true,    // air temperature (SHT31)
-    .hasAirHumidity    = true,    // air humidity (SHT31)
-    .hasHeaterTemp     = true,    // heater temperature (thermistor)
-    // Auto-publish periods:
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
-    // Portal identification:
     .hardwareVersion   = "1.0",
     .firmwareVersion   = "0.1.0",
     .model             = "DIY Storage Cabinet",
@@ -139,13 +140,8 @@ Combine both blocks above into one file — this is the entire `src/main.cpp` at
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // your own device: the card is built by the manifest
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -189,7 +185,7 @@ Until the device has Wi-Fi, the log is silent: the core keeps the serial port fo
 [INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-Leave the monitor open and go to the app.
+The last line is exactly what you need at this step: the network is there, there is no pairing secret, and the device is waiting for a token from the app. Leave the monitor open and go to the app.
 
 ## 9. Connect Wi-Fi and link the device in the app
 
@@ -200,6 +196,15 @@ Leave the monitor open and go to the app.
 5. After **Device paired**, the device appears in the device list on the portal and in the app.
 
 If the device is already on the network, open the **Pairing** step right away — tap its chip at the top of the window.
+
+![The Wi-Fi step in the app: network name and password](../../img/09-cabinet/04-app-wifi.png)
+*The **Wi-Fi** step: the app sends the network to the device over the air.*
+
+![The pairing step: the app has found the device on the network](../../img/09-cabinet/04-app-pairing.png)
+*The **Pairing** step: the app has found the device on the network by its serial number. Devices owned by others are marked as taken.*
+
+![The "device paired" message](../../img/09-cabinet/04-app-paired.png)
+*Done: the device is linked to the account and is about to appear in the list.*
 
 The log shows the pairing:
 
@@ -213,11 +218,20 @@ The log shows the pairing:
 
 ## Verification
 
-At this stage the device should be Online on the portal. There's no sensor data yet — this is expected. If something went wrong:
+At this stage the device should be Online on the portal. There's no sensor data yet — this is expected: `Config` has not declared anything about sensors, and the card has nothing to show.
 
-- the app did not see the device join the network — check the password and that the network is `2.4 GHz`; with a wrong password the device waits for settings again, repeat the Wi-Fi step;
+![The device card on the portal right after pairing](../../img/09-cabinet/04-portal-card.png)
+*The device on the portal: name, Idle state, connection icon. There are no readings — they will appear in the next chapter.*
+
+The name `Device DEVICE_…` is the factory one. Rename the device with the pencil next to the name: in the examples that follow it is called "Storage cabinet".
+
+If something went wrong:
+
+- the app did not see the device join the network — check the password and that the network is `2.4 GHz`; with a wrong password the device waits for settings again, reboot the board and repeat the Wi-Fi step;
+- the network is still not delivered over the air — do the same over USB with the web installer [install.idryer.org](https://install.idryer.org);
 - the app did not find the device on the **Pairing** step — the phone and the device must be on the same network, and the network must not block device discovery (guest networks often do);
 - the device reboots — check the ESP32 power supply (voltage drops on startup are a common cause of resets);
+- the build fails with an error — ask the community: [Telegram](https://t.me/iDryer), [Discord](https://discord.gg/jGce5eeHHz);
 - see [Power mistakes](../08-common-mistakes/02-power-mistakes.md) and [Controller mistakes](../08-common-mistakes/04-controller-mistakes.md).
 
 ## What's next

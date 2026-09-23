@@ -138,6 +138,12 @@ void loop() {
 
 Запуск и остановка приходят с карточки устройства на портале и в приложении. Прошивка объявляет их **действиями** карточки: ядро добавляет их в card-манифест, а портал и приложение сами рисуют форму и кнопки. Разбирать команды в коде не нужно — ядро вызывает вашу функцию.
 
+![Карточка с формой запуска](../../img/09-cabinet/07-portal-card.png)
+*Карточка собрана из манифеста: слева показания, включая мощность нагрева и вентилятор, справа форма с температурой и кнопкой запуска. Портал об этом устройстве ничего не знал — всё пришло от прошивки.*
+
+![Та же карточка в приложении](../../img/09-cabinet/07-app-card.png)
+*В приложении то же самое и из того же манифеста: показания, поле температуры и кнопка запуска.*
+
 Пределы поля температуры и значение по умолчанию берутся из пункта меню `target_temp` (30–50 °C, 45) через мост `card_menu_bridge.h`. Значение, которое ввёл пользователь, уходит с командой запуска и в меню не пишется. Добавьте заголовок рядом с заголовками меню из главы 6:
 
 ```cpp
@@ -206,16 +212,15 @@ card.action("stop", "IDLE", onStop)
     #include <Wire.h>
     #include <math.h>
     #include "Sht31ClimateSensor.h"
+    #include "demo_sensors.h"    // показания без датчиков (-DDEMO_SENSORS=1)
     #include <menu_state.h>                      // ← глава 6: параметры (menu.target_temp …)
     #include <menu_bindings.h>                   // ← глава 6: menu_apply_by_bind
     #include <menu_commands.h>                   // ← глава 6: menu_buildFullJson
     #include <local_access/device_publisher.h>   // ← глава 6: publishConfigRaw
 
     static const iDryer::Config CFG = {
-        .deviceType        = iDryer::DeviceType::Dryer,
+        .deviceType        = iDryer::DeviceType::Unknown,   // своё устройство: карточку собирает манифест
         .unitsCount        = 1,
-        .hasHeater         = true,
-        .hasFan            = true,
         .hasAirTemp        = true,
         .hasAirHumidity    = true,
         .hasHeaterTemp     = true,
@@ -242,6 +247,23 @@ card.action("stop", "IDLE", onStop)
         float r   = SERIES_R * (1.0f - v) / v;
         float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
         return tK - 273.15f;
+    }
+
+    // Показания: датчики или, с -DDEMO_SENSORS=1, модель шкафа
+    static void readSensors() {
+    #ifdef DEMO_SENSORS
+        demoSensors(s_link.telemetry);
+    #else
+        if (s_climateOk) {
+            s_climate.tick(millis());
+            SensorReading r = s_climate.get();
+            if (r.ok) {
+                s_link.telemetry.airTempC[0]       = r.temperature;
+                s_link.telemetry.airHumidityPct[0] = r.humidity;
+            }
+        }
+        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    #endif
     }
 
     // ← глава 6: меню на портале
@@ -295,15 +317,7 @@ card.action("stop", "IDLE", onStop)
             publishMenu();
         }
 
-        if (s_climateOk) {
-            s_climate.tick(millis());
-            SensorReading r = s_climate.get();
-            if (r.ok) {
-                s_link.telemetry.airTempC[0]       = r.temperature;
-                s_link.telemetry.airHumidityPct[0] = r.humidity;
-            }
-        }
-        s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+        readSensors();
     }
     ```
 
@@ -312,6 +326,7 @@ card.action("stop", "IDLE", onStop)
 #include <Wire.h>
 #include <math.h>
 #include "Sht31ClimateSensor.h"
+#include "demo_sensors.h"    // показания без датчиков (-DDEMO_SENSORS=1)
 #include <menu_state.h>
 #include <menu_bindings.h>
 #include <menu_commands.h>
@@ -319,10 +334,10 @@ card.action("stop", "IDLE", onStop)
 #include <card/card_menu_bridge.h>        // ← глава 7
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // своё устройство: карточку собирает манифест
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
+    .hasHeater         = true,     // ← глава 7
+    .hasFan            = true,        // ← глава 7
     .hasAirTemp        = true,
     .hasAirHumidity    = true,
     .hasHeaterTemp     = true,
@@ -349,6 +364,23 @@ static float readHeaterTempC() {
     float r   = SERIES_R * (1.0f - v) / v;
     float tK  = 1.0f / (1.0f / (NOMINAL_T + 273.15f) + logf(r / NOMINAL_R) / BETA);
     return tK - 273.15f;
+}
+
+// Показания: датчики или, с -DDEMO_SENSORS=1, модель шкафа
+static void readSensors() {
+#ifdef DEMO_SENSORS
+    demoSensors(s_link.telemetry);
+#else
+    if (s_climateOk) {
+        s_climate.tick(millis());
+        SensorReading r = s_climate.get();
+        if (r.ok) {
+            s_link.telemetry.airTempC[0]       = r.temperature;
+            s_link.telemetry.airHumidityPct[0] = r.humidity;
+        }
+    }
+    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+#endif
 }
 
 static bool s_menuPending = false;
@@ -460,15 +492,7 @@ void loop() {
         publishMenu();
     }
 
-    if (s_climateOk) {
-        s_climate.tick(millis());
-        SensorReading r = s_climate.get();
-        if (r.ok) {
-            s_link.telemetry.airTempC[0]       = r.temperature;
-            s_link.telemetry.airHumidityPct[0] = r.humidity;
-        }
-    }
-    s_link.telemetry.heaterTempC[0] = readHeaterTempC();
+    readSensors();
 
     controlLoop();   // ← глава 7
     applyHeater();   // ← глава 7
@@ -477,6 +501,18 @@ void loop() {
 ```
 
 ## Проверка результата
+
+![Карточка сразу после запуска хранения](../../img/09-cabinet/07-portal-session.png)
+*Сразу после запуска: режим Storage, цель 45 °C, мощность 100 %, вентилятор включён, идёт отсчёт времени.*
+
+![Карточка и график через три минуты нагрева](../../img/09-cabinet/07-portal-heating.png)
+*Через три минуты: воздух в шкафу поднялся, влажность упала, нагреватель вышел на рабочую температуру. На графике видно, как мощность включается и выключается по гистерезису.*
+
+![Запуск хранения из приложения](../../img/09-cabinet/07-app-session.png)
+*Хранение можно запустить и из приложения: появляется кнопка «Стоп» и отсчёт времени.*
+
+![Нагрев в приложении через три минуты](../../img/09-cabinet/07-app-heating.png)
+*Через три минуты в приложении: 43,9 из 45 °C, влажность упала с 51 до 33 %. На графике температура идёт вверх, влажность — вниз.*
 
 После этого шага:
 

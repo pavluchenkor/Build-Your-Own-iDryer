@@ -18,7 +18,7 @@ On this page you will assemble the device into the enclosure, perform the first 
 For enclosure design and component placement requirements — [Enclosure Design](../07-3d-printing/05-enclosure-design.md).
 
 !!! warning "3D-printed parts near heat"
-    PLA softens at temperatures easily found near the heater. Parts near heat must be printed from heat-resistant material. See [Heat-Resistant Materials](../07-3d-printing/04-heat-resistant-materials.md) and [Why PLA is Risky](../07-3d-printing/06-why-pla-is-risky.md).
+    PLA softens at temperatures easily found near the heater. Parts near heat must be printed from heat-resistant material: ABS, ASA or PA (nylon). See [Heat-Resistant Materials](../07-3d-printing/04-heat-resistant-materials.md) and [Why PLA is Risky](../07-3d-printing/06-why-pla-is-risky.md).
 
 ## Pre-Power Checks
 
@@ -34,7 +34,7 @@ How to use a multimeter — [Multimeter](../05-tools/02-multimeter.md).
 
 ## First Startup
 
-1. Apply power only to the controller and sensors (do not connect the load yet if possible).
+1. Apply power only to the controller and sensors. If a single power supply feeds everything, power the controller separately: from USB or through a step-down converter, and leave the heater wire disconnected for now.
 2. Verify the device is Online on the portal and displays temperature and humidity readings.
 3. Connect the heater and fan.
 4. Start the heat maintenance mode from the portal and observe.

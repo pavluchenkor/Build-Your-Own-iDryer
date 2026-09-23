@@ -17,6 +17,8 @@ Na této stránce je seznam součástek zařízení a dvě varianty silové čá
 | Rezistor pull-up termistoru | Dělič napětí pro ADC | Obvykle `4,7 kΩ` |
 | Zdroj napájení | Napájení kontroléru a nízkonapěťové periférie | Napětí pro vybranou verzi |
 
+C3 a S3 jsou pro tento příklad rovnocenné: kód, zapojení i postup sestavení jsou stejné. S3 je výkonnější a má větší paměť - vezměte jej, pokud budete později chtít přidat displej, adresovatelný LED pás nebo vlastní náročnou logiku.
+
 ESP32 byl vybrán proto, že obsahuje Wi-Fi, potřebná rozhraní (I2C pro SHT31, ADC pro termistor, PWM pro řízení zátěže) a je přímo podporován `idryer-core`. Více - [Kontrolér ESP32](../02-controllers/01-esp32-controller.md).
 
 !!! warning "Logika ESP32 - 3.3V"

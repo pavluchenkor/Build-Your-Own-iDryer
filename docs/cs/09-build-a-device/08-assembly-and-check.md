@@ -18,7 +18,7 @@ Na této stránce montujete zařízení do pouzdra, provádíte první kontrolov
 Požadavky na pouzdro a umístění prvků — [Návrh pouzdra](../07-3d-printing/05-enclosure-design.md).
 
 !!! warning "Tištěné díly v blízkosti tepla"
-    PLA změkne při teplotě, která se snadno vyskytuje v blízkosti topidla. Díly blízko tepla tisknout z tepelně odolného materiálu. Viz [Tepelně odolné materiály](../07-3d-printing/04-heat-resistant-materials.md) a [Proč je PLA riskantní volba](../07-3d-printing/06-why-pla-is-risky.md).
+    PLA změkne při teplotě, která se snadno vyskytuje v blízkosti topidla. Díly blízko tepla tisknout z tepelně odolného materiálu: ABS, ASA nebo PA (nylon). Viz [Tepelně odolné materiály](../07-3d-printing/04-heat-resistant-materials.md) a [Proč je PLA riskantní volba](../07-3d-printing/06-why-pla-is-risky.md).
 
 ## Kontrola před připojením napájecího proudu
 
@@ -34,7 +34,7 @@ Jak používat multimetr — [Multimetr](../05-tools/02-multimeter.md).
 
 ## První spuštění
 
-1. Připojte napájení pouze na regulátor a senzory (zatím nepřipojujte zátěž, pokud je to možné).
+1. Připojte napájení pouze na regulátor a senzory. Pokud je zdroj jeden pro všechno, napájejte regulátor zvlášť: z USB nebo přes snižující měnič, a vodič topidla zatím nepřipojujte.
 2. Ověřte, že je zařízení Online na portálu a zobrazuje teplotu a vlhkost.
 3. Připojte topidlo a ventilátor.
 4. Spusťte režim udržování tepla z portálu a sledujte.

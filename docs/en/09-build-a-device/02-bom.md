@@ -17,6 +17,8 @@ This page lists the components of the device and two options for the power secti
 | Thermistor pull-up resistor | Voltage divider for ADC | Usually `4.7 kΩ` |
 | Power supply | Power for controller and low-voltage peripherals | Voltage depends on chosen version |
 
+C3 and S3 are equivalent for this example: the code, the wiring and the assembly order are the same. S3 is more powerful and has more memory — take it if you later want to add a display, an addressable LED strip or your own heavy logic.
+
 ESP32 was chosen because it has Wi-Fi, the required interfaces (I2C for SHT31, ADC for thermistor, PWM for load control) and is directly supported by `idryer-core`. For more details, see [ESP32 Controller](../02-controllers/01-esp32-controller.md).
 
 !!! warning "ESP32 logic — 3.3V"

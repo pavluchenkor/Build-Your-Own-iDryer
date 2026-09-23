@@ -8,7 +8,7 @@ description: "ESP32 pinout map for DIY cabinet: SHT31 over I2C, thermistor on AD
 This page explains how to connect components around ESP32. First, a general pinout map, then connection of each node and rules for power section layout.
 
 !!! warning "Check your board pinout first"
-    The pin numbers below are examples. Different ESP32-C3 and ESP32-S3 boards have different numbering and pin layouts. Before assembly, verify the pinout of your specific board. Not all pins can be used freely: some are occupied by boot, flash, or USB.
+    The pin numbers below are examples. Different ESP32-C3 and ESP32-S3 boards have different numbering and pin layouts. Before assembly, verify the pinout of your specific development board: for DevKit and Super Mini it is published by the manufacturer and included in the board description. Not all pins can be used freely: some are occupied by boot, flash, or USB.
 
 ## Pinout Map (Example)
 

@@ -15,8 +15,10 @@ description: "基於 idryer-core 函式庫建立 PlatformIO 專案：platformio.
 
 - VS Code及PlatformIO擴充功能；
 - USB連接線；
-- `2.4 GHz` Wi-Fi網路（ESP32不支援僅`5 GHz`的網路）。
-- 一支裝有 iDryer 應用程式並已登入 iDryer 門戶帳戶的智慧型手機：裝置透過它取得 Wi-Fi 網路並綁定到帳戶。
+- `2.4 GHz` Wi-Fi網路（ESP32不支援僅`5 GHz`的網路）；
+- 一支裝有 iDryer 應用程式（[App Store](https://apps.apple.com/app/idryer/id6760609044)、[Google Play](https://play.google.com/store/apps/details?id=org.idryer.mobile)）並已登入 iDryer 門戶帳戶的智慧型手機：裝置透過它取得 Wi-Fi 網路並綁定到帳戶；
+- 核心函式庫 [idryer-core](https://github.com/pavluchenkor/idryer-core)；
+- 本章的現成專案——教材倉庫中的 [example/09-cabinet](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/09-cabinet)：感測器驅動和後面建議複製的其他檔案都取自這裡。
 
 什麼是控制器韌體以及它如何進入板——[控制器韌體](../02-controllers/11-flashing-controller.md)。
 
@@ -38,14 +40,21 @@ my-cabinet/
 將`idryer-core`函式庫放在`lib/`中——PlatformIO會自動在那裡找到函式庫。最簡單的方法是為下載的函式庫建立符號連結：
 
 ```bash
-ln -s /path/to/idryer-core lib/idryer-core
+git clone https://github.com/pavluchenkor/idryer-core.git ~/idryer-core
+ln -s ~/idryer-core lib/idryer-core
 ```
+
+也可以不用符號連結，直接把函式庫資料夾複製到`lib/idryer-core`——效果相同。
 
 菜單生成也需要這個（第6章）——hook在`lib/idryer-core/`內尋找生成器。
 
 ## 3. Wi-Fi 和綁定不寫在程式碼裡
 
 韌體中既沒有網路密碼，也沒有帳戶資料。首次啟動時裝置沒有 Wi-Fi，會等待設定：iDryer 應用程式以無線方式（ESPTouch）傳送設定，接著用一次性綁定權杖把裝置綁定到你的帳戶。這些都由核心庫在 `s_link.begin()` 和 `s_link.loop()` 中完成，你只需在應用程式中完成步驟——見第 9 節。
+
+**網路設定如何進入裝置。** 沒有存過網路的板子會監聽電波，就像一台還沒調到電台的收音機。手機此時把網路名稱和密碼「敲」進空中——差不多就是摩斯電碼，只是用 Wi-Fi 封包。板子接到這段傳送後連上網路，之後每次開機都會自己上網。這不需要額外的引腳和電線：用的是板子本身的天線，只要還沒有網路就會自動啟動，持續最多 90 秒。
+
+如果無線方式沒有成功，還有有線的路徑：網頁安裝程式 [install.idryer.org](https://install.idryer.org) 透過 USB 把網路和綁定權杖交給板子——和應用程式做的事情一樣，只是走線纜。把板子重新啟動一次也有幫助：重啟後它會重新等待設定。
 
 ## 4. 配置platformio.ini
 
@@ -87,18 +96,10 @@ build_flags =
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自製裝置：卡片由 card 清單組成
     .unitsCount        = 1,
-    // 外設：
-    .hasHeater         = true,    // 可控加熱器
-    .hasFan            = true,    // 風扇
-    .hasAirTemp        = true,    // 空氣溫度（SHT31）
-    .hasAirHumidity    = true,    // 空氣濕度（SHT31）
-    .hasHeaterTemp     = true,    // 加熱器溫度（溫敏電阻）
-    // 自動發佈週期：
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
-    // 門戶上的識別：
     .hardwareVersion   = "1.0",
     .firmwareVersion   = "0.1.0",
     .model             = "DIY Storage Cabinet",
@@ -139,13 +140,8 @@ void loop() {
 #include <iDryer.h>
 
 static const iDryer::Config CFG = {
-    .deviceType        = iDryer::DeviceType::Dryer,
+    .deviceType        = iDryer::DeviceType::Unknown,   // 自製裝置：卡片由 card 清單組成
     .unitsCount        = 1,
-    .hasHeater         = true,
-    .hasFan            = true,
-    .hasAirTemp        = true,
-    .hasAirHumidity    = true,
-    .hasHeaterTemp     = true,
     .telemetryPeriodMs = 5000,
     .statusPeriodMs    = 10000,
     .hardwareVersion   = "1.0",
@@ -189,7 +185,7 @@ pio device monitor -b 115200
 [INFO ] CLOUD: binding-v3: no secret — awaiting pairing token (SETUP)
 ```
 
-保持監視器開啟，轉到應用程式。
+最後一行正是這一步需要的：網路有了，綁定金鑰還沒有，裝置在等待應用程式送來的權杖。保持監視器開啟，轉到應用程式。
 
 ## 9. 在應用程式中連接 Wi-Fi 並綁定裝置
 
@@ -200,6 +196,15 @@ pio device monitor -b 115200
 5. 顯示 **设备已绑定** 後，裝置會出現在門戶和應用程式的裝置清單中。
 
 如果裝置已經在網路中，可以直接開啟 **绑定** 步驟——點選視窗頂部的對應標籤。
+
+![應用程式中的 Wi-Fi 步驟：網路名稱和密碼](../../img/09-cabinet/04-app-wifi.png)
+*步驟 **Wi-Fi**：應用程式以無線方式把網路交給裝置。*
+
+![綁定步驟：應用程式在網路中找到裝置](../../img/09-cabinet/04-app-pairing.png)
+*步驟 **绑定**：應用程式依序號在網路中找到裝置。別人的裝置會標示為已占用。*
+
+![「裝置已綁定」訊息](../../img/09-cabinet/04-app-paired.png)
+*完成：裝置已綁定到帳戶，馬上就會出現在清單中。*
 
 日誌中可以看到綁定過程：
 
@@ -213,11 +218,20 @@ pio device monitor -b 115200
 
 ## 驗證結果
 
-此時裝置應在門戶上顯示為 Online。還沒有感測器資料——這是正常的。如果出了問題：
+此時裝置應在門戶上顯示為 Online。還沒有感測器資料——這是正常的：`Config` 還沒有宣告任何感測器，卡片也就沒有東西可顯示。
 
-- 應用程式沒有等到裝置加入網路——檢查密碼以及網路是否為 `2.4 GHz`；密碼錯誤時裝置會重新等待設定，請重複 Wi-Fi 步驟；
+![綁定後門戶上的裝置卡片](../../img/09-cabinet/04-portal-card.png)
+*門戶上的裝置：名稱、Idle 狀態、連線圖示。還沒有讀數——它們會在下一章出現。*
+
+名稱 `Device DEVICE_…` 是出廠名稱。用名稱旁的鉛筆圖示重新命名裝置：後面的範例中它叫「Storage cabinet」。
+
+如果出了問題：
+
+- 應用程式沒有等到裝置加入網路——檢查密碼以及網路是否為 `2.4 GHz`；密碼錯誤時裝置會重新等待設定，請重新啟動板子並重複 Wi-Fi 步驟；
+- 網路始終無法以無線方式送達——改用 USB，透過網頁安裝程式 [install.idryer.org](https://install.idryer.org) 做同樣的事；
 - 在 **绑定** 步驟中應用程式沒有找到裝置——手機和裝置必須在同一網路中，且網路不能阻擋裝置探索（訪客網路常常會阻擋）；
 - 裝置反覆重新啟動——檢查 ESP32 的供電（啟動時的電壓下降是重置的常見原因）；
+- 建置失敗並出現錯誤——到社群提問：[Telegram](https://t.me/iDryer)、[Discord](https://discord.gg/jGce5eeHHz)；
 - 參見[供電錯誤](../08-common-mistakes/02-power-mistakes.md)和[控制器錯誤](../08-common-mistakes/04-controller-mistakes.md)。
 
 ## 下一步

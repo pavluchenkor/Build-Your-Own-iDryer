@@ -17,6 +17,8 @@ Nesta página está a lista de componentes do dispositivo e duas variantes da se
 | Resistor de pull-up do termistor | Divisor de tensão para ADC | Normalmente `4,7 kΩ` |
 | Fonte de alimentação | Alimentação do controlador e periféricos de baixa tensão | Tensão para a versão escolhida |
 
+C3 e S3 são equivalentes para este exemplo: o código, a ligação e a ordem de montagem são os mesmos. O S3 é mais potente e tem mais memória - escolha-o se mais tarde quiser acrescentar um ecrã, uma fita LED endereçável ou lógica pesada própria.
+
 ESP32 foi escolhido porque tem Wi-Fi, as interfaces necessárias (I2C para SHT31, ADC para termistor, PWM para controlo de carga) e é suportado directamente por `idryer-core`. Para mais detalhes - [Controlador ESP32](../02-controllers/01-esp32-controller.md).
 
 !!! warning "Lógica ESP32 - 3,3V"

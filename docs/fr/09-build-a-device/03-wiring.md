@@ -8,7 +8,7 @@ description: "Carte des broches ESP32 pour une armoire maison : SHT31 en I2C, th
 Cette page explique comment connecter les composants autour de l'ESP32. D'abord la carte générale des broches, puis la connexion de chaque nœud et les règles de routage de la partie puissance.
 
 !!! warning "Vérifiez d'abord le brochage de votre carte"
-    Les numéros de broches ci-dessous sont un exemple. Les différentes cartes ESP32-C3 et ESP32-S3 ont une numérotation et un positionnement différents. Avant le montage, consultez le brochage de votre carte spécifique. Toutes les broches ne peuvent pas être utilisées librement : certaines sont occupées par le chargement, le flash ou l'USB.
+    Les numéros de broches ci-dessous sont un exemple. Les différentes cartes ESP32-C3 et ESP32-S3 ont une numérotation et un positionnement différents. Avant le montage, consultez le brochage de votre carte de développement spécifique : pour les DevKit et Super Mini, il est publié par le fabricant et figure dans la description de la carte. Toutes les broches ne peuvent pas être utilisées librement : certaines sont occupées par le chargement, le flash ou l'USB.
 
 ## Carte des broches (exemple)
 
