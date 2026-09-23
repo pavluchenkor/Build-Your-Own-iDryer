@@ -112,7 +112,39 @@ L'état du ventilateur se publie par la voie du dictionnaire — écrivez juste 
 s_link.telemetry.fanOn[0] = fanIsOn;
 ```
 
-## 4. Vérification
+## 4. Pas de capteur sous la main ? Mode démo
+
+On peut parcourir tout le chemin jusqu'à la fiche même sans SGP40 : l'indice sera calculé par un modèle d'air. Copiez le fichier `demo_voc.h` de l'exemple :
+
+```bash
+git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+cp ~/byo-idryer/example/10-filter/src/demo_voc.h src/
+```
+
+et ajoutez à `platformio.ini` le drapeau de compilation :
+
+```ini
+build_flags =
+    -DDEMO_VOC=1
+```
+
+Les deux branches sont cachées derrière une seule fonction, et `loop()` ne sait pas d'où vient la valeur :
+
+```cpp
+static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
+    g_vocIndex = s_sgp.measureVocIndex();
+#endif
+}
+```
+
+Le modèle se comporte comme une pièce dans laquelle une imprimante travaille : tant que le ventilateur est arrêté, l'indice monte depuis une valeur de fond autour de `100`, et quand le ventilateur tourne il redescend. Le modèle prend l'état du ventilateur dans votre propre logique, donc le seuil et l'hystérésis du [chapitre 7](07-auto-logic.md) se voient à l'œuvre.
+
+Pour un appareil réel on ne met pas ce drapeau : c'est alors la branche avec le vrai capteur qui est compilée.
+
+## 5. Vérification
 
 Après flashage, dans le flux MQTT de l'appareil (ou dans le log Serial des publications), la télémétrie ressemble à ceci :
 
@@ -124,6 +156,9 @@ Après flashage, dans le flux MQTT de l'appareil (ou dans le log Serial des publ
 }
 ```
 
-`vocIndex` — votre propre champ, parti au cloud à côté du `fanStatus` du dictionnaire. Le portail le reçoit et le sauvegarde déjà, mais ne sait pas encore quoi en faire : montrez-lui ça dans le chapitre suivant.
+`vocIndex` — votre propre champ, parti au cloud à côté du `fanStatus` du dictionnaire. Le portail le reçoit déjà, mais ne sait pas encore quoi en faire : montrez-lui ça dans le chapitre suivant.
+
+!!! note "Votre champ vit en temps réel"
+    Le portail distribue la télémétrie aux clients telle quelle, donc la fiche affiche `vocIndex` tout de suite. En revanche, dans l'historique pour les graphiques, le serveur n'écrit que les grandeurs du dictionnaire — température, humidité, chauffage. Votre champ ne sera pas sur le graphique de télémétrie ; s'il vous faut un historique, collectez-le chez vous (par exemple Home Assistant ou votre propre base).
 
 Soufflez sur le capteur ou approchez un marqueur — l'indice devrait augmenter notablement en quelques secondes.

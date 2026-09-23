@@ -36,4 +36,4 @@ Le filtre est prêt. Après — selon le goût :
 - **Mise en page jolie** : vous avez déjà vu le `layoutRow` usine ;
 - **Vos propres appareils** : toute cette section — c'est un patron. Remplacez capteur, actionneur et logique — et par le même schéma vous assemblerez un humidificateur, une extraction, un contrôleur de n'importe quoi. Le manifeste fera l'interface seul.
 
-Si quelque chose ne marche pas — [Erreurs typiques](../08-common-mistakes/01-power-mistakes.md).
+Si quelque chose ne marche pas — [Erreurs typiques](../08-common-mistakes/01-overview.md).

@@ -112,7 +112,39 @@ s_link.onTelemetryPublish([](JsonObject doc) {
 s_link.telemetry.fanOn[0] = fanIsOn;
 ```
 
-## 4. 检查
+## 4. 手头没有传感器？演示模式
+
+没有SGP40也能走完到卡片的整条路：指数由空气模型算出。从示例中复制`demo_voc.h`文件：
+
+```bash
+git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+cp ~/byo-idryer/example/10-filter/src/demo_voc.h src/
+```
+
+并在`platformio.ini`中加上编译标志：
+
+```ini
+build_flags =
+    -DDEMO_VOC=1
+```
+
+两条分支都藏在同一个函数后面，`loop()`不知道值是从哪里来的：
+
+```cpp
+static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
+    g_vocIndex = s_sgp.measureVocIndex();
+#endif
+}
+```
+
+模型的表现就像一间正在打印的房间：风机停着时，指数从大约`100`的本底值往上爬，风机工作时下降。模型从你自己的逻辑中取风机状态，所以[第7章](07-auto-logic.md)的阈值和迟滞能看到实际效果。
+
+正式设备不加这个标志：那样编译的就是真实传感器的分支。
+
+## 5. 检查
 
 烧入固件后，在MQTT设备流中（或Serial日志中）遥测看起来像这样：
 
@@ -124,6 +156,9 @@ s_link.telemetry.fanOn[0] = fanIsOn;
 }
 ```
 
-`vocIndex` —— 你自己的字段，随着字典的`fanStatus`一起上云。门户已经接收并保存它，但还不知道怎么用：下一章告诉它。
+`vocIndex` —— 你自己的字段，随着字典的`fanStatus`一起上云。门户已经接收到它，但还不知道怎么用：下一章告诉它。
+
+!!! note "自定义字段只活在实时数据中"
+    门户把遥测原样分发给客户端，所以卡片立刻显示`vocIndex`。而服务器写入图表历史的只有字典量 —— 温度、湿度、加热。遥测图表上不会有你的自定义字段；如果需要历史，就自己收集（例如Home Assistant或自己的数据库）。
 
 对传感器呼气或靠近记号笔 —— 指数应该在几秒内明显上升。

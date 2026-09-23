@@ -18,7 +18,7 @@ Lista completa de componentes. Los precios son orientativos; todo se compra en c
 | Fuente de alimentación 12 V / 1 A | cualquiera de buena calidad | ~$4 | alimentación del ventilador |
 | Módulo reductor 12→5 V | mini-360 (buck) | ~$1 | alimentación de ESP32 desde la misma PSU |
 
-Sobre la selección de placas — [Controladores](../02-controllers/01-what-is-controller.md), sobre alimentación y módulos reductores — [Fundamentos de electrónica](../01-electronics-basics/01-voltage-current-resistance.md).
+Sobre la selección de placas — [Controladores](../02-controllers/00-how-to-choose-controller.md), sobre alimentación y módulos reductores — [Fundamentos de electrónica](../01-electronics-basics/01-load-calculation-24v.md).
 
 ## Parte filtrante
 
@@ -29,7 +29,7 @@ Sobre la selección de placas — [Controladores](../02-controllers/01-what-is-c
 | Carcasa | se imprime (diseña STL para tu filtro) o cualquier caja adecuada | mantiene todo junto |
 
 !!! note "Orden de capas"
-    El aire debe fluir: entrada → HEPA → carbón → ventilador → salida. El ventilador puede montarse "en salida" después de los filtros — así el aire sucio no se aspira por las grietas de la carcasa alrededor del filtro, pero en general no es crítico; trabajamos con la tasa de cambio de aire en el tiempo, cuanto mayor sea el CFM del ventilador, menor es este tiempo.
+    El aire debe fluir: entrada → HEPA → carbón → ventilador → salida. El ventilador se monta "en salida", después de los filtros: así el aire sucio no se aspira por las grietas de la carcasa evitando el filtro. En principio esto no es tan importante — lo que funciona es la tasa de renovación del volumen de aire en el tiempo: cuanto mayor sea el caudal del ventilador (CFM), menor es este tiempo.
 
 ## Por qué SGP40
 
@@ -44,4 +44,4 @@ Alternativas:
 
 ## Herramientas
 
-Soldador, flux, estaño, multímetro, termoencogible. Detalles — [Herramientas](../05-tools/01-multimeter.md).
+Soldador, flux, estaño, multímetro, termoencogible. Detalles — [Herramientas](../05-tools/02-multimeter.md).

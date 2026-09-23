@@ -7,6 +7,18 @@ description: "Charpente du firmware du filtre sur idryer-core : Config pour type
 
 La charpente du projet répète complètement [le chapitre de l'exemple avec l'armoire](../09-build-a-device/04-firmware-start.md) : PlatformIO, `idryer-core` dans `lib/`, même `platformio.ini` (changez juste le nom de l'environnement en `filter`). Ici — juste ce qui diffère.
 
+Le projet fini de ce chapitre — [example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter) dans le dépôt du manuel : c'est de là que viennent `platformio.ini` et tout le code décomposé par parties plus loin. La bibliothèque du noyau — [idryer-core](https://github.com/pavluchenkor/idryer-core).
+
+!!! note "Journal sur le port : deux drapeaux de compilation"
+    Sur l'ESP32-C3, la sortie `Serial` part par défaut sur les broches UART0, et non sur le port USB de la carte — le moniteur de port reste vide. Pour voir le journal, `build_flags` a besoin de deux lignes :
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    Les messages de l'ESP-IDF lui-même (erreurs mDNS et similaires) passent par USB même sans elles, donc « quelque chose s'imprime, mais pas mes lignes » est justement le signe de ces drapeaux manquants.
+
 ## Config : appareil de type non-standard
 
 Le filtre n'a ni radiateur ni capteur climatique du dictionnaire de l'écosystème. Du vocabulaire de l'écosystème, il n'a que le ventilateur. Dans `src/main.cpp` :
@@ -60,5 +72,8 @@ La procédure est la même que pour l'armoire :
 3. Après **Appareil associé**, l'appareil est associé à votre compte et passe `Online` sur le portail ; le journal affiche `MQTT: Connected!`.
 
 Détails, erreurs possibles et nouvelle association — dans [le chapitre de l'exemple de l'armoire](../09-build-a-device/04-firmware-start.md).
+
+![Page de l'appareil sur le portail juste après l'association](../../img/10-filter/04-portal-device.png)
+*L'appareil sur le portail : nom, état Idle, icône de liaison. Le graphique est vide et le menu n'est pas arrivé — l'appareil n'a rien déclaré à leur sujet.*
 
 Sur le portail, l'appareil est déjà visible, mais la fiche est presque vide — il n'y a pas de données encore. Allons connecter le capteur.

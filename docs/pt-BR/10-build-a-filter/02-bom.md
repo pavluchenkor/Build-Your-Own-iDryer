@@ -18,7 +18,7 @@ Lista completa de componentes. Os preços são aproximados, tudo é comprado em 
 | Fonte de alimentação 12 V / 1 A | qualquer uma de boa qualidade | ~$4 | alimenta o ventilador |
 | Módulo abaixador 12→5 V | mini-360 (buck) | ~$1 | alimenta o ESP32 da mesma fonte |
 
-Sobre a escolha de placas — [Controladores](../02-controllers/01-what-is-controller.md), sobre alimentação e módulos abaixadores — [Noções básicas de eletrônica](../01-electronics-basics/01-voltage-current-resistance.md).
+Sobre a escolha de placas — [Controladores](../02-controllers/00-how-to-choose-controller.md), sobre alimentação e módulos abaixadores — [Noções básicas de eletrônica](../01-electronics-basics/01-load-calculation-24v.md).
 
 ## Parte filtrante
 
@@ -29,7 +29,7 @@ Sobre a escolha de placas — [Controladores](../02-controllers/01-what-is-contr
 | Gabinete | impresso (você projeta o STL para seu filtro) ou qualquer caixa adequada | mantém tudo junto |
 
 !!! note "Ordem das camadas"
-    O ar deve seguir: entrada → HEPA → carvão → ventilador → saída. O ventilador pode ser colocado em exaustão após os filtros — assim, o ar não é puxado através de fendas do gabinete contornando o filtro, mas no geral isto não é crítico. Trabalhamos com a renovação do volume de ar em determinado tempo; quanto maior o CFM do ventilador, mais curto é esse tempo.
+    O ar deve seguir: entrada → HEPA → carvão → ventilador → saída. O ventilador é colocado em exaustão, depois dos filtros: assim o ar sujo não é puxado através de fendas do gabinete contornando o filtro. Isto não é tão crítico — o que funciona é a renovação do volume de ar em determinado tempo: quanto maior a vazão do ventilador (CFM), mais curto é esse tempo.
 
 ## Por que SGP40
 
@@ -44,4 +44,4 @@ Alternativas:
 
 ## Ferramentas
 
-Ferro de solda, fluxo, solda, multímetro, tubo termorretrátil. Detalhes — [Ferramentas](../05-tools/01-multimeter.md).
+Ferro de solda, fluxo, solda, multímetro, tubo termorretrátil. Detalhes — [Ferramentas](../05-tools/02-multimeter.md).

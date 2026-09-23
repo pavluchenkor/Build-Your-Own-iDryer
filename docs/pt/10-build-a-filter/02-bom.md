@@ -18,7 +18,7 @@ Lista completa de componentes. Os preços são orientativos; tudo pode ser adqui
 | Fonte de alimentação 12 V / 1 A | qualquer de boa qualidade | ~$4 | alimentação do ventilador |
 | Módulo buck 12→5 V | mini-360 (buck) | ~$1 | alimentação de ESP32 a partir da mesma fonte |
 
-Para a escolha de placas — [Controladores](../02-controllers/01-what-is-controller.md), para alimentação e módulos buck — [Eletrónica Básica](../01-electronics-basics/01-voltage-current-resistance.md).
+Para a escolha de placas — [Controladores](../02-controllers/00-how-to-choose-controller.md), para alimentação e módulos buck — [Eletrónica Básica](../01-electronics-basics/01-load-calculation-24v.md).
 
 ## Parte filtrante
 
@@ -29,7 +29,7 @@ Para a escolha de placas — [Controladores](../02-controllers/01-what-is-contro
 | Caixa | impressa (você projeta o STL para seu filtro) ou qualquer caixa adequada | mantém tudo junto |
 
 !!! note "Ordem das camadas"
-    O ar deve passar: entrada → HEPA → carvão → ventilador → saída. O ventilador pode estar em modo de sopro após os filtros — assim o ar sujo não é aspirado através das fendas da caixa contornando o filtro, mas em geral isso não é crítico; trabalhamos com o número de trocas de ar por unidade de tempo, quanto maior o CFM do ventilador menor este tempo.
+    O ar deve passar: entrada → HEPA → carvão → ventilador → saída. O ventilador coloca-se «em modo de sopro», depois dos filtros: assim o ar sujo não é aspirado através das fendas da caixa contornando o filtro. Em princípio isso não é tão importante — o que conta é a renovação do volume de ar por unidade de tempo: quanto maior o caudal do ventilador (CFM), menor esse tempo.
 
 ## Porque SGP40
 
@@ -44,4 +44,4 @@ Alternativas:
 
 ## Ferramentas
 
-Ferro de solda, flux, solda, multímetro, tubo termorretráctil. Detalhes — [Ferramentas](../05-tools/01-multimeter.md).
+Ferro de solda, flux, solda, multímetro, tubo termorretráctil. Detalhes — [Ferramentas](../05-tools/02-multimeter.md).

@@ -7,6 +7,18 @@ description: "Filter firmware skeleton on idryer-core: non-standard device Confi
 
 The project skeleton completely repeats [the chapter from the cabinet example](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` in `lib/`, same `platformio.ini` (replace only the environment name with `filter`). Here — only what's different.
 
+The ready-made project of this chapter — [example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter) in the tutorial repository: it is the source of `platformio.ini` and of all the code that is broken down piece by piece below. The core library — [idryer-core](https://github.com/pavluchenkor/idryer-core).
+
+!!! note "Log to the port: two build flags"
+    On ESP32-C3, `Serial` output goes by default to the UART0 pins, not to the board's USB port — the port monitor stays empty. To see the log, `build_flags` needs two lines:
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    Messages from ESP-IDF itself (mDNS errors and the like) go to USB even without them, so "something is printed, but my lines are missing" is a sign of exactly these missing flags.
+
 ## Config: non-standard device type
 
 The filter has neither a heater nor a climate sensor from the ecosystem vocabulary. From "vocabulary" skills it has only a fan. In `src/main.cpp`:
@@ -60,5 +72,8 @@ The procedure is the same as for the cabinet:
 3. After **Device paired**, the device is linked to your account and goes `Online` on the portal; the log shows `MQTT: Connected!`.
 
 Details, possible errors and re-pairing — in [the chapter of the cabinet example](../09-build-a-device/04-firmware-start.md).
+
+![The device page on the portal right after pairing](../../img/10-filter/04-portal-device.png)
+*The device on the portal: name, Idle state, connection icon. The chart is empty and no menu has arrived — the device declared nothing about them.*
 
 The device is already visible on the portal, but the card is still almost empty — there's no data yet. Let's connect the sensor.

@@ -36,4 +36,4 @@ description: "將濾清器組裝進機殼、過濾層順序，以及全面的檢
 - **精美佈局**：工廠 `layoutRow` 你已經用過；
 - **自己的裝置**：整章就是範本。替換感測器、執行器和邏輯——同樣的做法可以組裝加濕器、排氣機、任何東西的控制器。Card manifest 自動生成介面。
 
-有任何問題——[常見錯誤](../08-common-mistakes/01-power-mistakes.md)。
+有任何問題——[常見錯誤](../08-common-mistakes/01-overview.md)。

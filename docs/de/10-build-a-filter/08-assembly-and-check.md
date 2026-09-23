@@ -36,4 +36,4 @@ Filter ist bereit. Dann – nach Geschmack:
 - **Schönes Layout**: Fabrik-`layoutRow` Sie schon sahen;
 - **Ihre Geräte**: Dieser ganze Abschnitt – Schablone. Ersetzen Sie Sensor, Stellglied und Logik – und bauen Sie nach gleicher Schablone Befeuchter, Abluft-Controller, Steuerung von Allem auf. Das Manifest macht Interface selbst.
 
-Falls etwas nicht anspringt – [Typische Fehler](../08-common-mistakes/01-power-mistakes.md).
+Falls etwas nicht anspringt – [Typische Fehler](../08-common-mistakes/01-overview.md).

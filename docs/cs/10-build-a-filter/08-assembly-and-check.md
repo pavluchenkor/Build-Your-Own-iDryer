@@ -36,4 +36,4 @@ Filtr je hotov. Dál — dle libosti:
 - **Vlastní rozvržení**: `layoutRow` jste již viděli;
 - **Vlastní zařízení**: celý tento oddíl je šablona. Vyměňte senzor, akční člen a logiku — a podle stejného schématu postavíte zvlhčovač, odsávání, regulátor čehokoli. Manifest rozhraní sestaví sám.
 
-Pokud se něco nespustí — [Typické chyby](../08-common-mistakes/01-power-mistakes.md).
+Pokud se něco nespustí — [Typické chyby](../08-common-mistakes/01-overview.md).

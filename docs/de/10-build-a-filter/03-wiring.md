@@ -32,7 +32,7 @@ Pins können anders gewählt werden – ändern Sie dann die Nummern im Code ([K
 
 1. **Gemeinsame Masse.** GND der Stromversorgung, ESP32, MOSFET-Modul und Sensor müssen verbunden sein. Die Hälfte von „funktioniert nicht" in DIY-Projekten – vergessene gemeinsame Masse.
 2. **Sensor – nur auf 3,3 V.** SGP40 verträgt 5 V an der Stromversorgung nicht.
-3. **Lüfter – nur über Schalter.** GPIO gibt Milliampere ab; ein Lüfter zieht hundert. Direkter Anschluss brennt den Anschluss durch. Wie ein MOSFET-Schalter funktioniert – [Transistoren und Schalter](../01-electronics-basics/06-transistors-and-mosfets.md).
+3. **Lüfter – nur über Schalter.** GPIO gibt Milliampere ab; ein Lüfter zieht hundert. Direkter Anschluss brennt den Anschluss durch. Wie ein MOSFET-Schalter funktioniert – [Transistoren und Schalter](../01-electronics-basics/02-mosfet-module.md).
 4. **Externe Schutzdiode** für Computer-Lüfter ist normalerweise nicht erforderlich: Der Lüfter hat innen seine eigene Schalt-Elektronik und sieht von außen wie elektronische Last, nicht wie reine Induktivität. Aber beim Schalten der Stromversorgungsleitung mit Schalter (besonders mit PWM) ist eine Shunt-Diode parallel zum Lüfter nützlich als Schalter-Schutz vor induktiver Spannungsspitze – und falls sie bereits im Schalter-Modul vorhanden ist, ist das nur ein Plus.
 
 !!! warning "Überprüfen Sie die Polarität vor dem Einschalten"

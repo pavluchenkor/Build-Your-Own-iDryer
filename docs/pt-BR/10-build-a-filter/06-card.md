@@ -148,16 +148,17 @@ Em `layoutRow` você passa os **ids** das entidades — aqueles nomes internos q
 No cartão isto resultará em tal composição:
 
 ```text
-┌─ DIY Air Filter ────────────────┐
-│  VOC index        │  Ventilador │   ← linha 1: voc, fan
-│  103              │  Deslig      │
+┌─ Air filter ────────────────────┐
+│  ▮ 129            │  ≋ Off      │   ← linha 1: voc, fan
 ├───────────────────┴─────────────┤
 │  Mode                           │   ← linha 2: mode, threshold
 │  [auto                       ▾] │
 │  VOC threshold                  │
-│  [150                         ] │
+│  [100                         ] │
 └─────────────────────────────────┘
 ```
+
+Repare nas células: o portal desenha o ícone e o valor, sem legenda. O `label` da entidade vai para o nome usado por leitores de tela e para outras interfaces, e o espaço no cartão é economizado. Nos órgãos de controle a legenda aparece — `Mode` e `VOC threshold` no esquema acima.
 
 Entidades que você não mencionar em linha nenhuma não desaparecem — o portal as desenha abaixo automaticamente. Assim você pode delinear apenas o "principal", e deixar o resto para automação.
 
@@ -186,10 +187,16 @@ Não é necessário entender este JSON — o núcleo o gera de suas chamadas. Ma
 
 ## 5. Verificação
 
-Grave o firmware e abra o dashboard do portal:
+Grave o firmware e abra o **dashboard do portal** — o cartão vive lá mesmo, onde ficam os cartões dos aparelhos de fábrica, e no aplicativo móvel. Na página do próprio dispositivo ele não está: lá ficam os gráficos das grandezas do vocabulário, o menu e as integrações.
 
-- célula **VOC index** mostra índice ao vivo (sopre no sensor — o número cresce na próxima atualização);
-- célula **Ventilador** — Lig/Deslig;
+![Cartão do filtro no dashboard do portal](../../img/10-filter/06-portal-card.png)
+*O cartão é montado a partir do manifesto: índice VOC e ventilador em uma linha, modo e limiar abaixo.*
+
+![O mesmo cartão no aplicativo móvel](../../img/10-filter/06-app-card.png)
+*O aplicativo constrói o cartão a partir do mesmo manifesto — não é preciso código separado para o telefone.*
+
+- a célula do índice mostra o valor ao vivo (sopre no sensor — o número cresce na próxima atualização);
+- a célula do ventilador — Lig/Deslig;
 - **Mode** — lista suspensa, **VOC threshold** — campo numérico: o valor é enviado cerca de 0,6 s depois da mudança, sem botão de confirmação. A lista e o campo começam na primeira opção e no mínimo — eles enviam comandos e não mostram a configuração atual do dispositivo; o estado aparece nas células (por exemplo, o ventilador).
 
 Seleção de modo e limiar ainda não fazem nada — callbacks são esboços. Vamos trazê-los à vida no [próximo capítulo](07-auto-logic.md).

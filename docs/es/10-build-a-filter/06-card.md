@@ -148,16 +148,17 @@ En `layoutRow` pasas los **id** de las entidades — esos nombres internos que l
 En la tarjeta esto dará esta composición:
 
 ```text
-┌─ DIY Air Filter ────────────────┐
-│  VOC index        │  Ventilador │   ← fila 1: voc, fan
-│  103              │  Apagado    │
+┌─ Air filter ────────────────────┐
+│  ▮ 129            │  ≋ Apagado  │   ← fila 1: voc, fan
 ├───────────────────┴─────────────┤
 │  Mode                           │   ← fila 2: mode, threshold
 │  [auto                       ▾] │
 │  VOC threshold                  │
-│  [150                         ] │
+│  [100                         ] │
 └─────────────────────────────────┘
 ```
+
+Fíjate en las celdas: el portal dibuja el icono y el valor, sin la firma. El `label` de la entidad va al nombre para los lectores de pantalla y a otras interfaces, y así se ahorra espacio en la tarjeta. En los órganos de control la firma sí se ve — `Mode` y `VOC threshold` en el esquema de arriba.
 
 Las entidades que no menciones en ninguna fila no desaparecerán — el portal las dibujará abajo con lista automática. Así puedes diseñar solo lo "principal" y dejar el resto en la automática.
 
@@ -186,10 +187,16 @@ No necesitas entender este JSON — el núcleo lo genera a partir de tus llamada
 
 ## 5. Verificación
 
-Graba el firmware y abre el dashboard del portal:
+Graba el firmware y abre el **dashboard del portal** — la tarjeta vive allí mismo, donde las tarjetas de los dispositivos de fábrica, y en la aplicación móvil. En la página del propio dispositivo no está: allí hay gráficos de las magnitudes del diccionario, menú e integraciones.
 
-- la celda **VOC index** muestra el índice en vivo (sopla en el sensor — el número crece en la siguiente actualización);
-- la celda **Ventilador** — Encendido/Apagado;
+![Tarjeta del filtro en el dashboard del portal](../../img/10-filter/06-portal-card.png)
+*La tarjeta se arma según el manifest: el índice VOC y el ventilador en una fila, el modo y el umbral, abajo.*
+
+![La misma tarjeta en la aplicación móvil](../../img/10-filter/06-app-card.png)
+*La aplicación construye la tarjeta a partir del mismo manifest — no hace falta código aparte para el teléfono.*
+
+- la celda del índice muestra el valor en vivo (sopla en el sensor — el número crece en la siguiente actualización);
+- la celda del ventilador — Encendido/Apagado;
 - **Mode** — lista desplegable, **VOC threshold** — campo numérico: el valor se envía unos 0,6 s después de cambiarlo, sin botón de confirmación. La lista y el campo empiezan en la primera opción y en el mínimo: envían comandos y no muestran el ajuste actual del dispositivo; el estado lo muestran las celdas (por ejemplo, el ventilador).
 
 La selección de modo y umbral aún no hace nada — callbacks de prueba. Los animaremos en el [siguiente capítulo](07-auto-logic.md).

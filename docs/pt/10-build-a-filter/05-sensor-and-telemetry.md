@@ -112,7 +112,39 @@ O estado do ventilador publica-se pelo caminho de dicionário — basta escrever
 s_link.telemetry.fanOn[0] = fanIsOn;
 ```
 
-## 4. Verificação
+## 4. Sem sensor à mão? Modo demo
+
+O caminho até ao cartão também se percorre sem o SGP40: o índice é calculado por um modelo do ar. Copie o ficheiro `demo_voc.h` do exemplo:
+
+```bash
+git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+cp ~/byo-idryer/example/10-filter/src/demo_voc.h src/
+```
+
+e acrescente ao `platformio.ini` a flag de compilação:
+
+```ini
+build_flags =
+    -DDEMO_VOC=1
+```
+
+Ambos os ramos estão escondidos atrás de uma única função, e o `loop()` não sabe de onde veio o valor:
+
+```cpp
+static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
+    g_vocIndex = s_sgp.measureVocIndex();
+#endif
+}
+```
+
+O modelo comporta-se como uma sala onde uma impressora está a imprimir: enquanto o ventilador está parado, o índice sobe a partir do valor de fundo próximo de `100`, e com o ventilador a funcionar desce. O modelo retira o estado do ventilador da sua própria lógica, por isso o limiar e a histerese do [capítulo 7](07-auto-logic.md) veem-se em funcionamento.
+
+Para um dispositivo em serviço a flag não se define: nesse caso compila-se o ramo com o sensor real.
+
+## 5. Verificação
 
 Após carregar no stream MQTT do dispositivo (ou no log Serial de publicações) a telemetria fica assim:
 
@@ -124,6 +156,9 @@ Após carregar no stream MQTT do dispositivo (ou no log Serial de publicações)
 }
 ```
 
-`vocIndex` — seu campo próprio, viajando na nuvem junto com `fanStatus` de dicionário. O portal já o recebe e guarda, mas ainda não sabe o que fazer: mostre-lhe isto no próximo capítulo.
+`vocIndex` — seu campo próprio, viajando na nuvem junto com `fanStatus` de dicionário. O portal já o recebe, mas ainda não sabe o que fazer: mostre-lhe isto no próximo capítulo.
+
+!!! note "O campo próprio vive em tempo real"
+    O portal distribui a telemetria aos clientes tal como está, por isso o cartão mostra `vocIndex` de imediato. Já no histórico para os gráficos o servidor escreve apenas grandezas do dicionário — temperatura, humidade, aquecimento. O seu campo não aparecerá no gráfico de telemetria; se precisar de histórico, recolha-o do seu lado (por exemplo, Home Assistant ou uma base de dados própria).
 
 Respire sobre o sensor ou aproxime um marcador — o índice deve crescer significativamente em segundos.

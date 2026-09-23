@@ -7,6 +7,18 @@ description: "Estrutura da firmware do filtro em idryer-core: Config para tipo d
 
 A estrutura do projeto repete inteiramente [o capítulo do exemplo com o armário](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` em `lib/`, mesmo `platformio.ini` (substitua apenas o nome do ambiente para `filter`). Aqui — apenas o que é diferente.
 
+O projeto pronto deste capítulo — [example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter) no repositório do manual: é de lá que vêm o `platformio.ini` e todo o código analisado a seguir por partes. A biblioteca do núcleo — [idryer-core](https://github.com/pavluchenkor/idryer-core).
+
+!!! note "Log na porta: duas flags de compilação"
+    No ESP32-C3 a saída `Serial` vai por omissão para os pinos UART0 e não para a porta USB da placa — o Serial Monitor fica vazio. Para ver o log, são necessárias duas linhas em `build_flags`:
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    As mensagens do próprio ESP-IDF (erros de mDNS e semelhantes) chegam ao USB mesmo sem elas, por isso «alguma coisa é impressa, mas as minhas linhas não» é sinal precisamente destas flags em falta.
+
 ## Config: dispositivo de tipo não-standard
 
 O filtro não tem nem aquecedor nem sensor de clima do dicionário do ecossistema. Das capacidades do dicionário tem apenas ventilador. Em `src/main.cpp`:
@@ -60,5 +72,8 @@ O procedimento é o mesmo que para o armário:
 3. Depois de **Dispositivo emparelhado**, o dispositivo fica associado à sua conta e passa a `Online` no portal; o log mostra `MQTT: Connected!`.
 
 Detalhes, erros possíveis e nova associação — no [capítulo do exemplo do armário](../09-build-a-device/04-firmware-start.md).
+
+![Página do dispositivo no portal logo após a vinculação](../../img/10-filter/04-portal-device.png)
+*Dispositivo no portal: nome, estado Idle, ícone de ligação. O gráfico está vazio e o menu não chegou — o dispositivo não declarou nada sobre eles.*
 
 No portal o dispositivo é já visível, mas o cartão está quase vazio — ainda não há dados. Vamos ligar o sensor.

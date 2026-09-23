@@ -161,6 +161,19 @@ void setup() {
 | Mode `off` from portal | fan stops, VOC continues showing |
 | Board reboot | mode and threshold saved |
 
+This is what it looks like live. The threshold is `150`, the index reached it — the fan turned on by itself:
+
+![Automation turned the fan on at the threshold](../../img/10-filter/07-portal-auto-on.png)
+*Mode `auto`: index `151` with threshold `150` — the fan is on.*
+
+![The same in the mobile app](../../img/10-filter/07-app-auto-on.png)
+*The app shows the same state: the value has grown, the fan is running.*
+
+Manual mode overrides the automation: `Mode` → `on`, and the fan spins even when the air is already clean:
+
+![Manual mode: the fan is on with clean air](../../img/10-filter/07-portal-mode-on.png)
+*Mode `on`, index `132` — below the threshold, but the fan is running: a command from the portal outweighs the automation.*
+
 ## 7. Complete code: src/main.cpp whole
 
 All code from chapters 4–7, assembled into one file. If something doesn't match yours — check against this listing.
@@ -176,6 +189,7 @@ All code from chapters 4–7, assembled into one file. If something doesn't matc
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // index without a sensor (-DDEMO_VOC=1)
 
 // ── Pins ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // MOSFET gate for fan
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = no data yet
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// The sensor or, with -DDEMO_VOC=1, the air model (chapter 5).
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // Index: ~100 = normal air, higher = dirtier (max 500).
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── Fan (chapter 7) ──────────────────────────────────────────

@@ -161,6 +161,19 @@ void setup() {
 | Režim `off` z portálu | ventilátor stojí, VOC se nadále zobrazuje |
 | Restart desky | režim a práh se zachovaly |
 
+Takto to vypadá živě. Práh `150`, index se k němu dostal — ventilátor se sám zapnul:
+
+![Automatika zapnula ventilátor na prahu](../../img/10-filter/07-portal-auto-on.png)
+*Režim `auto`: index `151` při prahu `150` — ventilátor je zapnutý.*
+
+![Totéž v mobilní aplikaci](../../img/10-filter/07-app-auto-on.png)
+*Aplikace ukazuje tentýž stav: hodnota vzrostla, ventilátor běží.*
+
+Ruční režim přebije automatiku: `Mode` → `on`, a ventilátor běží, i když je vzduch už čistý:
+
+![Ruční režim: ventilátor zapnutý při čistém vzduchu](../../img/10-filter/07-portal-mode-on.png)
+*Režim `on`, index `132` — pod prahem, ale ventilátor běží: příkaz z portálu má přednost před automatikou.*
+
 ## 7. Výsledný kód: src/main.cpp celý
 
 Veškerý kód kapitol 4–7, složený do jednoho souboru. Pokud se něco neshoduje s vaší verzí — srovnávejte s tímto výpisem.
@@ -176,6 +189,7 @@ Veškerý kód kapitol 4–7, složený do jednoho souboru. Pokud se něco nesho
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // index bez senzoru (-DDEMO_VOC=1)
 
 // ── Piny ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // gate MOSFET ventilátoru
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = údaje ještě nejsou
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// Senzor nebo, s -DDEMO_VOC=1, model vzduchu (kapitola 5).
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // Index: ~100 = normální vzduch, více = špinavěji (max 500).
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── Ventilátor (kapitola 7) ────────────────────────────────

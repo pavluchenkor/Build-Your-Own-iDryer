@@ -7,6 +7,18 @@ description: "Estrutura base do firmware do filtro em idryer-core: configuraçã
 
 A estrutura do projeto repete completamente o [capítulo do exemplo do gabinete](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` em `lib/`, o mesmo `platformio.ini` (apenas mude o nome do ambiente para `filter`). Aqui — apenas o que é diferente.
 
+O projeto pronto deste capítulo — [example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter) no repositório do tutorial: é de lá que vêm o `platformio.ini` e todo o código que adiante é analisado por partes. A biblioteca do núcleo — [idryer-core](https://github.com/pavluchenkor/idryer-core).
+
+!!! note "Log na porta: duas flags de build"
+    No ESP32-C3, a saída `Serial` por padrão vai para os pinos do UART0, e não para a porta USB da placa — o monitor de porta fica vazio. Para ver o log, o `build_flags` precisa de duas linhas:
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    As mensagens do próprio ESP-IDF (erros de mDNS e semelhantes) vão para o USB mesmo sem elas, por isso «algo é impresso, mas as minhas linhas não» é sinal justamente dessas flags faltando.
+
 ## Config: dispositivo de tipo não-padrão
 
 O filtro não tem nem aquecedor, nem sensor de clima do dicionário do ecossistema. Do vocabulário do ecossistema, ele só tem ventilador. Em `src/main.cpp`:
@@ -60,5 +72,8 @@ O procedimento é o mesmo do gabinete:
 3. Depois de **Dispositivo vinculado**, o dispositivo está vinculado à sua conta e fica `Online` no portal; o log mostra `MQTT: Connected!`.
 
 Detalhes, erros possíveis e nova vinculação — no [capítulo do exemplo do gabinete](../09-build-a-device/04-firmware-start.md).
+
+![Página do dispositivo no portal logo após a vinculação](../../img/10-filter/04-portal-device.png)
+*Dispositivo no portal: nome, estado Idle, ícone de conexão. O gráfico está vazio e o menu não chegou — o dispositivo não declarou nada sobre eles.*
 
 O dispositivo já é visível no portal, mas o cartão está quase vazio — ainda não há dados. Vamos conectar o sensor.

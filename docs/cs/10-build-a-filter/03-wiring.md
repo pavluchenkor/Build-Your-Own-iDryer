@@ -32,7 +32,7 @@ Piny lze zvolit jinak — pak změňte čísla v kódu ([kapitola 5](05-sensor-a
 
 1. **Společná zem.** GND zdroje, ESP32, MOSFET modulu a senzoru musí být vzájemně propojeny. Polovina „nefunguje" u domácích projektů způsobuje zapomenutá společná zem.
 2. **Senzor — pouze na 3,3 V.** SGP40 netoleruje 5 V na napájení.
-3. **Ventilátor — pouze skrz klíč.** GPIO vydává miliampéry; ventilátor potřebuje stovky. Přímé připojení spálí pin. Jak funguje MOSFET klíč — [Tranzistory a MOSFET klíče](../01-electronics-basics/06-transistors-and-mosfets.md).
+3. **Ventilátor — pouze skrz klíč.** GPIO vydává miliampéry; ventilátor potřebuje stovky. Přímé připojení spálí pin. Jak funguje MOSFET klíč — [Tranzistory a MOSFET klíče](../01-electronics-basics/02-mosfet-module.md).
 4. **Externí ochranná dioda** pro počítačový ventilátor obvykle není nutná: ventilátor má uvnitř vlastní spínací elektroniku a zvenku se chová jako elektronická zátěž, nikoli jako čistá indukčnost. Ale při spínání napájecí větve klíčem (zejména s PWM) je ochranná dioda paralelně k ventilátoru užitečná jako ochrana tranzistoru před indukčním napěťovým špičkem — a je-li již součástí modulu spínače, jen dobře.
 
 !!! warning "Zkontrolujte polaritu před zapnutím"

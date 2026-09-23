@@ -148,16 +148,17 @@ Do `layoutRow` se předávají **id** entit — interní jména přiřazená př
 Na kartě to vytvoří toto rozvržení:
 
 ```text
-┌─ DIY Air Filter ────────────────┐
-│  VOC index        │  Ventilátor │   ← řádek 1: voc, fan
-│  103              │  Vyp        │
+┌─ Air filter ────────────────────┐
+│  ▮ 129            │  ≋ Off      │   ← řádek 1: voc, fan
 ├───────────────────┴─────────────┤
 │  Mode                           │   ← řádek 2: mode, threshold
 │  [auto                       ▾] │
 │  VOC threshold                  │
-│  [150                         ] │
+│  [100                         ] │
 └─────────────────────────────────┘
 ```
+
+Všimněte si buněk: portál vykresluje ikonu a hodnotu, bez popisku. `label` entity jde do jména pro čtečky obrazovky a do dalších rozhraní, a místo na kartě se tím šetří. U ovládacích prvků je popisek vidět — `Mode` a `VOC threshold` ve schématu výše.
 
 Entity, které jste nezmínili v žádném řádku, se neztratí — portál je doplní pod ním automaticky. Takže stačí rozvrhnout jen „to nejdůležitější" a zbytek přenechat automatice.
 
@@ -186,10 +187,16 @@ Tento JSON rozebírat nemusíte — jádro jej generuje z vašich volání. Je a
 
 ## 5. Ověření
 
-Nahrajte firmware a otevřete dashboard portálu:
+Nahrajte firmware a otevřete **dashboard portálu** — karta žije tam, kde karty sériových zařízení, a v mobilní aplikaci. Na stránce samotného zařízení není: tam jsou grafy slovníkových veličin, menu a integrace.
 
-- dlaždice **VOC index** zobrazuje živý index (vydechněte na senzor — při příštím obnovení číslo vzroste);
-- dlaždice **Ventilátor** — Zap/Vyp;
+![Karta filtru na dashboardu portálu](../../img/10-filter/06-portal-card.png)
+*Karta je sestavena z manifestu: VOC index a ventilátor v jednom řádku, režim a práh níže.*
+
+![Táž karta v mobilní aplikaci](../../img/10-filter/06-app-card.png)
+*Aplikace staví kartu z téhož manifestu — samostatný kód pro telefon není potřeba.*
+
+- dlaždice indexu zobrazuje živou hodnotu (vydechněte na senzor — při příštím obnovení číslo vzroste);
+- dlaždice ventilátoru — Zap/Vyp;
 - **Mode** — rozbalovací seznam, **VOC threshold** — číselné pole: hodnota se odešle asi 0,6 s po změně, bez potvrzovacího tlačítka. Seznam a pole začínají první možností a minimem — posílají příkazy a neukazují aktuální nastavení zařízení; stav ukazují buňky (například ventilátor).
 
 Výběr režimu a prahu zatím nic nedělá — to jsou prázdné zástupce callbacků. Oživíme je v [následující kapitole](07-auto-logic.md).

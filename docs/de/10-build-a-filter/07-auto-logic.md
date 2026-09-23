@@ -161,6 +161,19 @@ void setup() {
 | Modus `off` vom Portal | Lüfter still, VOC zeigt weiter |
 | Platte neu gestartet | Modus und Schwelle gespeichert |
 
+So sieht das live aus. Schwelle `150`, der Index hat sie erreicht – der Lüfter ging von selbst an:
+
+![Die Automatik hat den Lüfter an der Schwelle eingeschaltet](../../img/10-filter/07-portal-auto-on.png)
+*Modus `auto`: Index `151` bei Schwelle `150` – der Lüfter ist an.*
+
+![Dasselbe in der mobilen App](../../img/10-filter/07-app-auto-on.png)
+*Die App zeigt denselben Zustand: der Wert ist gestiegen, der Lüfter läuft.*
+
+Der Handbetrieb übersteuert die Automatik: `Mode` → `on`, und der Lüfter dreht, auch wenn die Luft schon sauber ist:
+
+![Handbetrieb: Lüfter an bei sauberer Luft](../../img/10-filter/07-portal-mode-on.png)
+*Modus `on`, Index `132` – unter der Schwelle, aber der Lüfter läuft: der Befehl vom Portal wiegt schwerer als die Automatik.*
+
 ## 7. Kompletter Code: src/main.cpp ganz
 
 Ganzer Code Kapitel 4–7, in einer Datei gesammelt. Falls etwas mit Ihrem nicht stimmt – vergleichen Sie mit diesem Listing.
@@ -176,6 +189,7 @@ Ganzer Code Kapitel 4–7, in einer Datei gesammelt. Falls etwas mit Ihrem nicht
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // Index ohne Sensor (-DDEMO_VOC=1)
 
 // ── Pins ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // Lüfter-MOSFET Gate
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = noch keine Daten
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// Sensor oder, mit -DDEMO_VOC=1, Luftmodell (Kapitel 5).
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // Index: ~100 = normale Luft, höher = schmutziger (max 500).
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── Lüfter (Kapitel 7) ────────────────────────────────────

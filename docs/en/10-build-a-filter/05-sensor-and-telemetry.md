@@ -112,7 +112,39 @@ The fan status is published the vocabulary way — just write it to the core fie
 s_link.telemetry.fanOn[0] = fanIsOn;
 ```
 
-## 4. Verification
+## 4. No sensor at hand? Demo mode
+
+You can walk the whole path up to the card without an SGP40: the index will be computed by an air model. Copy the `demo_voc.h` file from the example:
+
+```bash
+git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+cp ~/byo-idryer/example/10-filter/src/demo_voc.h src/
+```
+
+and add a build flag to `platformio.ini`:
+
+```ini
+build_flags =
+    -DDEMO_VOC=1
+```
+
+Both branches are hidden behind a single function, and `loop()` does not know where the value came from:
+
+```cpp
+static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
+    g_vocIndex = s_sgp.measureVocIndex();
+#endif
+}
+```
+
+The model behaves like a room with a printer running in it: while the fan is off, the index creeps up from a background value of about `100`, and while the fan runs it falls. The model takes the fan state from your own logic, so the threshold and hysteresis from [chapter 7](07-auto-logic.md) can be seen at work.
+
+For a real device the flag is not set: then the branch with the real sensor is built.
+
+## 5. Verification
 
 After flashing, in the MQTT stream of the device (or in Serial log of publications), telemetry looks like this:
 
@@ -124,6 +156,9 @@ After flashing, in the MQTT stream of the device (or in Serial log of publicatio
 }
 ```
 
-`vocIndex` — your own field, sent to the cloud alongside the vocabulary `fanStatus`. The portal already receives and stores it, but does not yet know what to do with it: show it to the portal in the next chapter.
+`vocIndex` — your own field, sent to the cloud alongside the vocabulary `fanStatus`. The portal already receives it, but does not yet know what to do with it: show it to the portal in the next chapter.
+
+!!! note "A custom field lives in real time"
+    The portal passes telemetry to clients as is, so the card shows `vocIndex` right away. But into the history for charts the server writes only vocabulary values — temperature, humidity, heating. Your own field will not be on the telemetry chart; if you need history, collect it yourself (for example, Home Assistant or your own database).
 
 Breathe on the sensor or bring a marker to it — the index should noticeably grow within seconds.

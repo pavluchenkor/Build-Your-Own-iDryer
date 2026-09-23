@@ -112,7 +112,39 @@ Der Lüfter-Status wird über das Wörterbuch veröffentlicht – schreiben Sie 
 s_link.telemetry.fanOn[0] = fanIsOn;
 ```
 
-## 4. Überprüfung
+## 4. Kein Sensor zur Hand? Demo-Modus
+
+Den Weg bis zur Karte kann man auch ohne SGP40 gehen: den Index berechnet ein Luftmodell. Kopieren Sie die Datei `demo_voc.h` aus dem Beispiel:
+
+```bash
+git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+cp ~/byo-idryer/example/10-filter/src/demo_voc.h src/
+```
+
+und fügen Sie in `platformio.ini` ein Build-Flag hinzu:
+
+```ini
+build_flags =
+    -DDEMO_VOC=1
+```
+
+Beide Zweige sind hinter einer Funktion versteckt, und `loop()` weiß nicht, woher der Wert kam:
+
+```cpp
+static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
+    g_vocIndex = s_sgp.measureVocIndex();
+#endif
+}
+```
+
+Das Modell verhält sich wie ein Raum, in dem ein Drucker druckt: solange der Lüfter steht, kriecht der Index vom Hintergrundwert um `100` nach oben, und bei laufendem Lüfter fällt er. Den Lüfter-Status nimmt das Modell aus Ihrer eigenen Logik, deshalb sind Schwelle und Hysterese aus [Kapitel 7](07-auto-logic.md) in Aktion zu sehen.
+
+Für ein Arbeitsgerät wird das Flag nicht gesetzt: dann wird der Zweig mit dem echten Sensor gebaut.
+
+## 5. Überprüfung
 
 Nach der Programmierung sieht die Telemetrie im MQTT-Stream des Geräts (oder im Serial-Log der Veröffentlichungen) so aus:
 
@@ -124,6 +156,9 @@ Nach der Programmierung sieht die Telemetrie im MQTT-Stream des Geräts (oder im
 }
 ```
 
-`vocIndex` – Ihr eigenes Feld, das in die Cloud geht neben dem Wörterbuch-`fanStatus`. Das Portal erhält und speichert es bereits, weiß aber noch nicht, was damit anfangen: Zeigen Sie das im nächsten Kapitel.
+`vocIndex` – Ihr eigenes Feld, das in die Cloud geht neben dem Wörterbuch-`fanStatus`. Das Portal erhält es bereits, weiß aber noch nicht, was damit anfangen: Zeigen Sie das im nächsten Kapitel.
+
+!!! note "Das eigene Feld lebt in Echtzeit"
+    Das Portal verteilt die Telemetrie an die Clients so, wie sie ist, deshalb zeigt die Karte `vocIndex` sofort. In die Historie für die Graphen schreibt der Server aber nur Wörterbuch-Größen – Temperatur, Luftfeuchtigkeit, Heizung. Ihr eigenes Feld wird im Telemetrie-Graphen nicht auftauchen; wenn Sie Historie brauchen, sammeln Sie sie bei sich (zum Beispiel Home Assistant oder eine eigene Datenbank).
 
 Atmen Sie auf den Sensor oder bringen Sie einen Marker heran – der Index sollte sich innerhalb von Sekunden merklich erhöhen.

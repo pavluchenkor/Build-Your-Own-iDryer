@@ -112,7 +112,39 @@ Stav ventilátoru se publikuje slovníkovou cestou — zapište jej do pole jád
 s_link.telemetry.fanOn[0] = fanIsOn;
 ```
 
-## 4. Ověření
+## 4. Nemáte senzor po ruce? Demo režim
+
+Projít cestu až ke kartě lze i bez SGP40: index spočítá model vzduchu. Zkopírujte soubor `demo_voc.h` z příkladu:
+
+```bash
+git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+cp ~/byo-idryer/example/10-filter/src/demo_voc.h src/
+```
+
+a přidejte do `platformio.ini` příznak sestavení:
+
+```ini
+build_flags =
+    -DDEMO_VOC=1
+```
+
+Obě větve jsou schované za jednou funkcí a `loop()` neví, odkud hodnota přišla:
+
+```cpp
+static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
+    g_vocIndex = s_sgp.measureVocIndex();
+#endif
+}
+```
+
+Model se chová jako místnost, ve které tiskne tiskárna: dokud ventilátor stojí, index stoupá od klidové hodnoty kolem `100`, a při běžícím ventilátoru klesá. Stav ventilátoru model bere z vaší vlastní logiky, takže práh a hystereze z [kapitoly 7](07-auto-logic.md) jsou vidět v provozu.
+
+Pro provozní zařízení se příznak nenastavuje: pak se sestaví větev se skutečným senzorem.
+
+## 5. Ověření
 
 Po nahrání firmwaru v MQTT streamu zařízení (nebo v Serial logu publikací) bude telemetrie vypadat takto:
 
@@ -124,6 +156,9 @@ Po nahrání firmwaru v MQTT streamu zařízení (nebo v Serial logu publikací)
 }
 ```
 
-`vocIndex` — vaše vlastní pole, které odešlo do cloudu společně se slovníkovým `fanStatus`. Portál jej již přijímá a ukládá, ale zatím neví, co s ním dělat: ukažte mu to v následující kapitole.
+`vocIndex` — vaše vlastní pole, které odešlo do cloudu společně se slovníkovým `fanStatus`. Portál jej již přijímá, ale zatím neví, co s ním dělat: ukažte mu to v následující kapitole.
+
+!!! note "Vlastní pole žije v reálném čase"
+    Portál rozesílá telemetrii klientům tak, jak přišla, takže karta ukazuje `vocIndex` okamžitě. Do historie pro grafy ale server zapisuje jen slovníkové veličiny — teplotu, vlhkost, ohřev. Vlastní pole na grafu telemetrie nebude; pokud potřebujete historii, sbírejte si ji sami (například Home Assistant nebo vlastní databáze).
 
 Vydechněte na senzor nebo přiložte fix — index by měl za pár sekund znatelně vzrůst.

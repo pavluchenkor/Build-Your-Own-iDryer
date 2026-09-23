@@ -7,6 +7,18 @@ description: "Kostra programu filtru na idryer-core: Config nestandardního typu
 
 Kostra projektu je totožná s [kapitolou z příkladu se skříní](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` v `lib/`, stejný `platformio.ini` (změňte pouze název prostředí na `filter`). Zde — jen to, co se liší.
 
+Hotový projekt této kapitoly — [example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter) v repozitáři učebnice: odtud se berou `platformio.ini` a všechen kód, který se dále rozebírá po částech. Knihovna jádra — [idryer-core](https://github.com/pavluchenkor/idryer-core).
+
+!!! note "Log do portu: dva příznaky sestavení"
+    U ESP32-C3 jde výstup `Serial` ve výchozím nastavení na piny UART0, nikoli na USB port desky — monitor portu zůstává prázdný. Abyste log viděli, musí být v `build_flags` dva řádky:
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    Zprávy samotného ESP-IDF (chyby mDNS a podobné) jdou na USB i bez nich, takže „něco se vypisuje, ale moje řádky chybí" je známkou právě těchto chybějících příznaků.
+
 ## Config: zařízení nestandardního typu
 
 Filtr nemá ani ohřívač, ani klimatický senzor ze slovníku ekosystému. Ze „slovníkových" schopností má pouze ventilátor. V `src/main.cpp`:
@@ -60,5 +72,8 @@ Postup je stejný jako u skříně:
 3. Po zprávě **Zařízení spárováno** je zařízení propojené s vaším účtem a na portálu přejde do stavu `Online`; v logu je `MQTT: Connected!`.
 
 Podrobnosti, možné chyby a opětovné propojení — v [kapitole příkladu se skříní](../09-build-a-device/04-firmware-start.md).
+
+![Stránka zařízení na portálu hned po spárování](../../img/10-filter/04-portal-device.png)
+*Zařízení na portálu: název, stav Idle, ikona spojení. Graf je prázdný a menu nepřišlo — zařízení o nich nic neohlásilo.*
 
 V portálu je zařízení vidět, ale karta je zatím téměř prázdná — data ještě nejsou. Jdeme připojit senzor.

@@ -7,6 +7,18 @@ description: "濾清器韌體框架在 idryer-core 上：非標準裝置型別�
 
 專案框架完全重複[機櫃範例的章節](../09-build-a-device/04-firmware-start.md)：PlatformIO、`lib/` 中的 `idryer-core`、相同的 `platformio.ini`（只需將環境名稱改為 `filter`）。這裡只是差異部分。
 
+本章的完整專案在教材儲存庫中——[example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter)：`platformio.ini` 和後面逐段拆解的全部程式碼都取自那裡。核心函式庫——[idryer-core](https://github.com/pavluchenkor/idryer-core)。
+
+!!! note "日誌送到連接埠：兩個編譯旗標"
+    ESP32-C3 的 `Serial` 輸出預設走 UART0 接腳，而不是開發板的 USB 連接埠——序列埠監視器一片空白。要看到日誌，`build_flags` 中需要兩行：
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    ESP-IDF 自己的訊息（mDNS 錯誤之類）沒有這兩行也會走 USB，所以「有東西在輸出，但我的那幾行沒有」正是缺少這兩個旗標的徵兆。
+
 ## Config：非標準裝置型別
 
 濾清器沒有加熱器，也沒有生態系統辭彙中的氣候感測器。從「辭彙」技能中，它只有風扇。在 `src/main.cpp` 中：
@@ -60,5 +72,8 @@ void loop() {
 3. 顯示 **设备已绑定** 後，裝置已綁定到你的帳戶，並在入口網站上變為 `Online`；日誌中出現 `MQTT: Connected!`。
 
 詳細說明、可能的錯誤和重新綁定——見[儲料櫃範例的章節](../09-build-a-device/04-firmware-start.md)。
+
+![綁定後立即看到的入口網站裝置頁面](../../img/10-filter/04-portal-device.png)
+*入口網站上的裝置：名稱、Idle 狀態、連線圖示。圖表是空的，選單也沒有送來——裝置並未宣告過它們。*
 
 裝置在入口網站上已經可見，但卡片現在幾乎是空的——還沒有資料。接著來連接感測器。

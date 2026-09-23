@@ -149,16 +149,17 @@ Dans `layoutRow` on passe les **id** des entités — les noms internes que vous
 Sur la fiche ça donnera cette composition :
 
 ```text
-┌─ DIY Air Filter ────────────────┐
-│  VOC index        │  Ventilateur │   ← rangée 1: voc, fan
-│  103              │  Éteint      │
+┌─ Air filter ────────────────────┐
+│  ▮ 129            │  ≋ Off      │   ← rangée 1: voc, fan
 ├───────────────────┴─────────────┤
 │  Mode                           │   ← rangée 2: mode, threshold
 │  [auto                       ▾] │
 │  VOC threshold                  │
-│  [150                         ] │
+│  [100                         ] │
 └─────────────────────────────────┘
 ```
+
+Regardez les cellules : le portail dessine une icône et une valeur, sans signature. Le `label` de l'entité part dans le nom destiné aux lecteurs d'écran et dans les autres interfaces, et la place sur la fiche est économisée. Pour les organes de commande la signature est visible — `Mode` et `VOC threshold` sur le schéma ci-dessus.
 
 Les entités que vous n'avez mentionnées dans aucune rangée ne disparaîtront pas — le portail les dessinera dessous en liste automatique. Vous pouvez ainsi mettre en page juste « l'essentiel », et laisser le reste à l'automatique.
 
@@ -187,10 +188,16 @@ Comprendre ce JSON n'est pas obligatoire — le noyau le génère à partir de v
 
 ## 5. Vérification
 
-Flashez et ouvrez le tableau de bord du portail :
+Flashez et ouvrez le **tableau de bord du portail** — la fiche vit là où vivent les fiches des appareils d'usine, ainsi que dans l'application mobile. Sur la page de l'appareil lui-même elle n'y est pas : là se trouvent les graphiques des grandeurs du dictionnaire, le menu et les intégrations.
 
-- la cellule **VOC index** montre l'indice en direct (soufflez sur le capteur — le nombre croît au prochain mise à jour) ;
-- la cellule **Ventilateur** — Allumé/Éteint ;
+![Fiche du filtre sur le tableau de bord du portail](../../img/10-filter/06-portal-card.png)
+*La fiche est assemblée d'après le manifeste : indice VOC et ventilateur dans une même rangée, mode et seuil en dessous.*
+
+![La même fiche dans l'application mobile](../../img/10-filter/06-app-card.png)
+*L'application construit la fiche à partir du même manifeste — pas besoin de code séparé pour le téléphone.*
+
+- la cellule de l'indice montre la valeur en direct (soufflez sur le capteur — le nombre croît au prochain mise à jour) ;
+- la cellule du ventilateur — Allumé/Éteint ;
 - **Mode** — liste déroulante, **VOC threshold** — champ numérique : la valeur part environ 0,6 s après la modification, sans bouton de confirmation. La liste et le champ commencent à la première option et au minimum : ils envoient des commandes et n'affichent pas le réglage actuel de l'appareil ; l'état est montré par les cellules (par exemple le ventilateur).
 
 La sélection du mode et du seuil ne fait rien pour le moment — ce sont des callbacks vides. Nous les ferons vivre dans [le chapitre suivant](07-auto-logic.md).

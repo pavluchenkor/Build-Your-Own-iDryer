@@ -7,6 +7,18 @@ description: "フィルターのファームウェアスケルトンをidryer-co
 
 プロジェクトのひな型は[キャビネットサンプルの章](../09-build-a-device/04-firmware-start.md)と全く同じです: PlatformIO、`lib/`内の`idryer-core`、同じ`platformio.ini`（環境名を`filter`に変えるだけ）。ここでは異なる部分だけを説明します。
 
+この章の完成プロジェクトは、教材リポジトリの[example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter)です: `platformio.ini`と、以降で分割して解説するコード一式はそこから取得します。コアライブラリは[idryer-core](https://github.com/pavluchenkor/idryer-core)です。
+
+!!! note "ポートへのログ出力: 2つのビルドフラグ"
+    ESP32-C3では`Serial`の出力が既定でUART0のピンに出て、ボードのUSBポートには出ません — Serial Monitorは空のままです。ログを見るには、`build_flags`に2行必要です:
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    ESP-IDF自身のメッセージ（mDNSのエラーなど）はこれらがなくてもUSBに出ます。そのため「何かは表示されるのに自分の行だけ出ない」のは、まさにこのフラグが足りない兆候です。
+
 ## Config: 非標準型デバイス
 
 フィルターには、ヒーターもエコシステム辞書のクライメートセンサーもありません。辞書スキルの中でこのデバイスが持つのはファンだけです。`src/main.cpp`内:
@@ -60,5 +72,8 @@ void loop() {
 3. **ペアリングが完了しました**の後、デバイスはあなたのアカウントに紐付けられ、ポータルで`Online`になります。ログには`MQTT: Connected!`が表示されます。
 
 詳細、起こりうるエラー、再ペアリングについては[キャビネットの例の章](../09-build-a-device/04-firmware-start.md)を参照してください。
+
+![ペアリング直後のポータルのデバイスページ](../../img/10-filter/04-portal-device.png)
+*ポータル上のデバイス: 名前、Idle状態、通信アイコン。グラフは空でメニューも届いていません — デバイスがそれらについて何も宣言していないためです。*
 
 ポータルにデバイスが表示されますが、カードはまだほぼ空です — データがないためです。センサーの接続に進みましょう。

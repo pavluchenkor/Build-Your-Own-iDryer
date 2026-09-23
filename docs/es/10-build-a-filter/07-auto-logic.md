@@ -161,6 +161,19 @@ void setup() {
 | Modo `off` desde el portal | el ventilador está apagado, VOC sigue mostrándo |
 | Reinicio de la placa | el modo y umbral se guardaron |
 
+Así se ve en vivo. El umbral es `150`, el índice llegó hasta él — el ventilador se encendió solo:
+
+![La automatización encendió el ventilador en el umbral](../../img/10-filter/07-portal-auto-on.png)
+*Modo `auto`: índice `151` con umbral `150` — el ventilador está encendido.*
+
+![Lo mismo en la aplicación móvil](../../img/10-filter/07-app-auto-on.png)
+*La aplicación muestra el mismo estado: el valor creció, el ventilador funciona.*
+
+El modo manual tiene prioridad sobre la automatización: `Mode` → `on`, y el ventilador gira incluso cuando el aire ya está limpio:
+
+![Modo manual: ventilador encendido con el aire limpio](../../img/10-filter/07-portal-mode-on.png)
+*Modo `on`, índice `132` — por debajo del umbral, pero el ventilador funciona: el comando desde el portal manda sobre la automatización.*
+
 ## 7. Código completo: src/main.cpp entero
 
 Todo el código de los capítulos 4–7, reunido en un archivo. Si algo no coincide con el tuyo — compara con este listado.
@@ -176,6 +189,7 @@ Todo el código de los capítulos 4–7, reunido en un archivo. Si algo no coinc
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // índice sin sensor (-DDEMO_VOC=1)
 
 // ── Pines ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // compuerta MOSFET del ventilador
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = sin datos aún
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// Sensor o, con -DDEMO_VOC=1, modelo del aire (capítulo 5).
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // Índice: ~100 = aire normal, más alto = más sucio (máx 500).
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── Ventilador (capítulo 7) ────────────────────────────────────

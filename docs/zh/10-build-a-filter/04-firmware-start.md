@@ -7,6 +7,18 @@ description: "过滤器固件框架基于idryer-core：非标设备类型的Conf
 
 项目框架完全模仿[加热柜示例中的章节](../09-build-a-device/04-firmware-start.md)：PlatformIO、`lib/`中的`idryer-core`，同样的`platformio.ini`（只需将环境名改为`filter`）。这里只讲不同的部分。
 
+本章的现成项目——教程仓库中的 [example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter)：`platformio.ini` 和后面逐段拆解的全部代码都取自那里。核心库——[idryer-core](https://github.com/pavluchenkor/idryer-core)。
+
+!!! note "日志输出到端口：两个编译标志"
+    ESP32-C3 的 `Serial` 输出默认走 UART0 的引脚，而不是板子的 USB 口——Serial Monitor 里一片空白。要看到日志，`build_flags` 中需要两行：
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    ESP-IDF 自身的消息（mDNS 错误之类）没有这两行也会走 USB，所以"有东西在打印，但我的行没有"恰恰是缺少这两个标志的迹象。
+
 ## Config：非标设备类型
 
 过滤器既没有加热器，也没有生态系统字典中的气候传感器。从字典功能中它只有风机。在`src/main.cpp`中：
@@ -60,5 +72,8 @@ void loop() {
 3. 显示 **设备已绑定** 后，设备已绑定到你的账户，并在门户上变为 `Online`；日志中出现 `MQTT: Connected!`。
 
 详细说明、可能的错误和重新绑定——见[储料柜示例的章节](../09-build-a-device/04-firmware-start.md)。
+
+![绑定后立即看到的门户设备页面](../../img/10-filter/04-portal-device.png)
+*门户上的设备：名称、Idle 状态、连接图标。图表是空的，菜单也没有到达——设备没有声明过它们。*
 
 设备已在门户上可见，但卡片还几乎是空的——还没有数据。继续连接传感器。

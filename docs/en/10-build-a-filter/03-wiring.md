@@ -32,7 +32,7 @@ You can choose different pins — then change the numbers in the code ([chapter 
 
 1. **Common ground.** GND of the power supply, ESP32, MOSFET module, and sensor must be connected. Half of "doesn't work" in DIY projects is forgotten common ground.
 2. **Sensor only on 3.3V.** SGP40 cannot handle 5V on power.
-3. **Fan only through a switch.** GPIO outputs milliamps; a fan takes hundreds. Direct connection will burn the pin. How a MOSFET switch works — [Transistors and switches](../01-electronics-basics/06-transistors-and-mosfets.md).
+3. **Fan only through a switch.** GPIO outputs milliamps; a fan takes hundreds. Direct connection will burn the pin. How a MOSFET switch works — [Transistors and switches](../01-electronics-basics/02-mosfet-module.md).
 4. **External protective diode** for a computer fan is usually not required: the fan has its own switching electronics inside, and from the outside it looks like an electronic load, not a pure inductance. But when switching the power line with a key (especially with PWM), a shunting diode across the fan is useful as protection of the key from inductive spikes — and if it is already in the key module, that is a bonus.
 
 !!! warning "Check polarity before power-on"

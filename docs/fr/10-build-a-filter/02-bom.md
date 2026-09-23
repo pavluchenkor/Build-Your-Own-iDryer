@@ -18,7 +18,7 @@ Liste complète des composants. Les prix sont approximatifs, tout se trouve sur 
 | Alimentation 12 V / 1 A | n'importe quelle qualité | ~$4 | alimentation du ventilateur |
 | Module abaisseur 12→5 V | mini-360 (buck) | ~$1 | alimentation ESP32 depuis la même alimentation |
 
-Pour le choix des cartes — [Contrôleurs](../02-controllers/01-what-is-controller.md), pour l'alimentation et les modules abaisseurs — [Bases de l'électronique](../01-electronics-basics/01-voltage-current-resistance.md).
+Pour le choix des cartes — [Contrôleurs](../02-controllers/00-how-to-choose-controller.md), pour l'alimentation et les modules abaisseurs — [Bases de l'électronique](../01-electronics-basics/01-load-calculation-24v.md).
 
 ## Partie filtrante
 
@@ -29,7 +29,7 @@ Pour le choix des cartes — [Contrôleurs](../02-controllers/01-what-is-control
 | Boîtier | imprimé (vous concevez le STL pour votre filtre) ou n'importe quelle boîte adaptée | tient tout ensemble |
 
 !!! note "Ordre des couches"
-    L'air doit passer : entrée → HEPA → charbon → ventilateur → sortie. Le ventilateur peut être placé « en extraction » après les filtres — c'est pour que l'air sale n'entre pas par les fentes du boîtier en contournant le filtre, mais globalement ce n'est pas critique, nous travaillons avec le renouvellement du volume d'air en un certain temps, plus le CFM du ventilateur est élevé, plus ce temps est court.
+    L'air doit passer : entrée → HEPA → charbon → ventilateur → sortie. Le ventilateur se place « en extraction », après les filtres : ainsi l'air sale n'est pas aspiré par les fentes du boîtier en contournant le filtre. Ce n'est pas si critique — ce qui compte, c'est le renouvellement du volume d'air par unité de temps : plus le débit du ventilateur (CFM) est élevé, plus ce temps est court.
 
 ## Pourquoi SGP40
 
@@ -44,4 +44,4 @@ Alternatives :
 
 ## Outils
 
-Fer à souder, flux, étain, multimètre, gaine thermorétractable. En détail — [Outils](../05-tools/01-multimeter.md).
+Fer à souder, flux, étain, multimètre, gaine thermorétractable. En détail — [Outils](../05-tools/02-multimeter.md).

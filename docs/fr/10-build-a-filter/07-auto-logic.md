@@ -161,6 +161,19 @@ void setup() {
 | Mode `off` depuis le portail | ventilateur arrêté, VOC continue d'afficher |
 | Redémarrage de la carte | mode et seuil sauvegardés |
 
+Voilà à quoi ça ressemble en vrai. Seuil `150`, l'indice l'a atteint — le ventilateur s'est allumé tout seul :
+
+![L'automatisation a allumé le ventilateur au seuil](../../img/10-filter/07-portal-auto-on.png)
+*Mode `auto` : indice `151` pour un seuil `150` — ventilateur allumé.*
+
+![La même chose dans l'application mobile](../../img/10-filter/07-app-auto-on.png)
+*L'application affiche le même état : la valeur a monté, le ventilateur tourne.*
+
+Le mode manuel prend le dessus sur l'automatisation : `Mode` → `on`, et le ventilateur tourne même quand l'air est déjà propre :
+
+![Mode manuel : ventilateur allumé alors que l'air est propre](../../img/10-filter/07-portal-mode-on.png)
+*Mode `on`, indice `132` — en dessous du seuil, mais le ventilateur tourne : la commande depuis le portail prime sur l'automatisation.*
+
 ## 7. Code final : src/main.cpp complet
 
 Tout le code des chapitres 4–7, rassemblé en un seul fichier. Si quelque chose ne correspond pas au vôtre — vérifiez avec ce listing.
@@ -176,6 +189,7 @@ Tout le code des chapitres 4–7, rassemblé en un seul fichier. Si quelque chos
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // indice sans capteur (-DDEMO_VOC=1)
 
 // ── Broches ──────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // grille MOSFET du ventilateur
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = pas encore de données
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// Capteur ou, avec -DDEMO_VOC=1, modèle d'air (chapitre 5).
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // Indice: ~100 = air normal, plus haut = plus sale (max 500).
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── Ventilateur (chapitre 7) ────────────────────────────────

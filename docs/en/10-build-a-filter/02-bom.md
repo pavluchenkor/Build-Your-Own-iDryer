@@ -18,7 +18,7 @@ Complete list of components. Prices are approximate; everything is available on 
 | 12V / 1A power supply | any quality one | ~$4 | fan power |
 | 12→5V step-down module | mini-360 (buck) | ~$1 | powering ESP32 from the same PSU |
 
-For board selection — [Controllers](../02-controllers/01-what-is-controller.md), for power and step-down modules — [Electronics Basics](../01-electronics-basics/01-voltage-current-resistance.md).
+For board selection — [Controllers](../02-controllers/00-how-to-choose-controller.md), for power and step-down modules — [Electronics Basics](../01-electronics-basics/01-load-calculation-24v.md).
 
 ## Filter section
 
@@ -29,7 +29,7 @@ For board selection — [Controllers](../02-controllers/01-what-is-controller.md
 | Case | 3D printed (design STL for your filter) or any suitable box | holds everything together |
 
 !!! note "Layer order"
-    Air flow should be: inlet → HEPA → carbon → fan → outlet. The fan can be installed "as exhaust" after the filters — this prevents dirty air from being drawn in around the case bypassing the filter, but overall this is not critical; we work with air turnover over time, the higher the fan CFM the shorter this time.
+    Air flow should be: inlet → HEPA → carbon → fan → outlet. The fan is installed "as exhaust", after the filters: then dirty air is not drawn in through the case gaps, bypassing the filter. This is not that critical — what matters is air volume turnover over time: the higher the fan performance (CFM), the shorter this time.
 
 ## Why SGP40
 
@@ -44,4 +44,4 @@ Alternatives:
 
 ## Tools
 
-Soldering iron, flux, solder, multimeter, heat shrink. Details — [Tools](../05-tools/01-multimeter.md).
+Soldering iron, flux, solder, multimeter, heat shrink. Details — [Tools](../05-tools/02-multimeter.md).

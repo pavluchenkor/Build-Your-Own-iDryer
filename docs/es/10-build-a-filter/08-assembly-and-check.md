@@ -36,4 +36,4 @@ El filtro está listo. Después — según el gusto:
 - **Diseño bonito**: el `layoutRow` de fábrica que ya viste;
 - **Tus propios dispositivos**: toda esta sección es una plantilla. Cambia el sensor, el mecanismo y la lógica — y por el mismo esquema construyes humidificador, extractor, controlador de lo que sea. El manifest hará el interface por sí solo.
 
-Si algo no funciona — [Errores típicos](../08-common-mistakes/01-power-mistakes.md).
+Si algo no funciona — [Errores típicos](../08-common-mistakes/01-overview.md).

@@ -32,7 +32,7 @@ Puedes elegir otros pines — luego cambia los números en el código ([capítul
 
 1. **Tierra común.** GND de la fuente, ESP32, módulo MOSFET y sensor deben estar conectados. La mitad de los "no funciona" en proyectos caseros — tierra común olvidada.
 2. **Sensor — solo a 3.3 V.** SGP40 no tolera 5 V en la alimentación.
-3. **Ventilador — solo a través de la llave.** GPIO proporciona miliamperios; el ventilador consume cientos. La conexión directa quemará el pin. Cómo funciona una llave MOSFET — [Transistores y llaves](../01-electronics-basics/06-transistors-and-mosfets.md).
+3. **Ventilador — solo a través de la llave.** GPIO proporciona miliamperios; el ventilador consume cientos. La conexión directa quemará el pin. Cómo funciona una llave MOSFET — [Transistores y llaves](../01-electronics-basics/02-mosfet-module.md).
 4. **Diodo de protección externo** para un ventilador de computadora generalmente no es obligatorio: el ventilador tiene su propia electrónica de conmutación adentro, y externamente parece una carga electrónica, no una inductancia pura. Pero al conmutar la línea de alimentación con la llave (especialmente con PWM), un diodo de derivación paralelo al ventilador es útil como protección de la llave contra sobretensión inductiva — y si ya está en el módulo de la llave, es solo una ventaja.
 
 !!! warning "Verifica la polaridad antes de encender"

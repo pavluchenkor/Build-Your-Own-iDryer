@@ -161,6 +161,19 @@ void setup() {
 | Modo `off` do portal | ventilador parado, VOC continua mostrando |
 | Reiniciar placa | modo e limiar foram salvos |
 
+Assim fica ao vivo. Limiar `150`, o índice chegou até ele — o ventilador ligou sozinho:
+
+![A automação ligou o ventilador no limiar](../../img/10-filter/07-portal-auto-on.png)
+*Modo `auto`: índice `151` com limiar `150` — ventilador ligado.*
+
+![O mesmo no aplicativo móvel](../../img/10-filter/07-app-auto-on.png)
+*O aplicativo mostra o mesmo estado: o valor subiu, o ventilador está funcionando.*
+
+O modo manual se sobrepõe à automação: `Mode` → `on`, e o ventilador gira mesmo quando o ar já está limpo:
+
+![Modo manual: ventilador ligado com o ar limpo](../../img/10-filter/07-portal-mode-on.png)
+*Modo `on`, índice `132` — abaixo do limiar, mas o ventilador funciona: o comando do portal é mais importante que a automação.*
+
 ## 7. Código final: src/main.cpp completamente
 
 Todo o código dos capítulos 4–7, montado em um arquivo. Se algo não coincidir com o seu — compare com esta listagem.
@@ -176,6 +189,7 @@ Todo o código dos capítulos 4–7, montado em um arquivo. Se algo não coincid
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // índice sem sensor (-DDEMO_VOC=1)
 
 // ── Pinos ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // porta MOSFET do ventilador
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = sem dados ainda
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// Sensor ou, com -DDEMO_VOC=1, modelo de ar (capítulo 5).
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // Índice: ~100 = ar normal, maior = mais sujo (máx 500).
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── Ventilador (capítulo 7) ────────────────────────────────────

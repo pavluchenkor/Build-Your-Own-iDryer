@@ -161,6 +161,19 @@ void setup() {
 | Modo `off` a partir do portal | ventilador parado, VOC continua mostrando-se |
 | Reinicializar a placa | modo e limiar guardaram-se |
 
+É assim que fica ao vivo. Limiar `150`, o índice chegou até ele — o ventilador ligou sozinho:
+
+![A automatização ligou o ventilador no limiar](../../img/10-filter/07-portal-auto-on.png)
+*Modo `auto`: índice `151` com limiar `150` — ventilador ligado.*
+
+![O mesmo na aplicação móvel](../../img/10-filter/07-app-auto-on.png)
+*A aplicação mostra o mesmo estado: o valor subiu, o ventilador está a funcionar.*
+
+O modo manual sobrepõe-se à automatização: `Mode` → `on`, e o ventilador gira mesmo quando o ar já está limpo:
+
+![Modo manual: ventilador ligado com o ar limpo](../../img/10-filter/07-portal-mode-on.png)
+*Modo `on`, índice `132` — abaixo do limiar, mas o ventilador funciona: o comando do portal é mais importante que a automatização.*
+
 ## 7. Código final: src/main.cpp inteiro
 
 Todo o código dos capítulos 4–7, reunido num ficheiro. Se algo não corresponder ao seu — compare com esta listagem.
@@ -176,6 +189,7 @@ Todo o código dos capítulos 4–7, reunido num ficheiro. Se algo não correspo
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // índice sem sensor (-DDEMO_VOC=1)
 
 // ── Pinos ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // gate MOSFET do ventilador
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = sem dados ainda
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// Sensor ou, com -DDEMO_VOC=1, modelo do ar (capítulo 5).
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // Índice: ~100 = ar normal, superior = mais sujo (máx 500).
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── Ventilador (capítulo 7) ──────────────────────────────────

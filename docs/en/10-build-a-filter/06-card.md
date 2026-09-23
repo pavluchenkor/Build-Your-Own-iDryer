@@ -148,16 +148,17 @@ To `layoutRow` you pass the **id** of entities — those internal names you gave
 On the card this will give this arrangement:
 
 ```text
-┌─ DIY Air Filter ────────────────┐
-│  VOC index        │  Fan        │   ← row 1: voc, fan
-│  103              │  Off        │
+┌─ Air filter ────────────────────┐
+│  ▮ 129            │  ≋ Off      │   ← row 1: voc, fan
 ├───────────────────┴─────────────┤
 │  Mode                           │   ← row 2: mode, threshold
 │  [auto                       ▾] │
 │  VOC threshold                  │
-│  [150                         ] │
+│  [100                         ] │
 └─────────────────────────────────┘
 ```
+
+Note the cells: the portal draws an icon and a value, without a caption. The entity's `label` goes into the name for screen readers and into other interfaces, while space on the card is saved. Controls do show their caption — `Mode` and `VOC threshold` in the diagram above.
 
 Entities you don't mention in any row won't disappear — the portal will draw them below in automatic list. So you can layout only the "main" and leave the rest to automation.
 
@@ -186,10 +187,16 @@ You don't need to understand this JSON — the core generates it from your calls
 
 ## 5. Verification
 
-Flash and open the dashboard on the portal:
+Flash and open the **portal dashboard** — the card lives where the cards of factory devices live, and in the mobile app. It is not on the device page itself: that page has charts of vocabulary values, the menu and integrations.
 
-- cell **VOC index** shows live index (blow on the sensor — the number grows on the next update);
-- cell **Fan** — On/Off;
+![The filter card on the portal dashboard](../../img/10-filter/06-portal-card.png)
+*The card is assembled from the manifest: the VOC index and the fan in one row, mode and threshold below.*
+
+![The same card in the mobile app](../../img/10-filter/06-app-card.png)
+*The app builds the card from the same manifest — no separate code for the phone is needed.*
+
+- the index cell shows the live value (blow on the sensor — the number grows on the next update);
+- the fan cell — On/Off;
 - **Mode** — dropdown list, **VOC threshold** — number field: the value is sent about 0.6 s after you change it, without a confirm button. The list and the field start from the first option and the minimum — they send commands and do not show the current device setting; the state is shown by the cells (for example, the fan).
 
 Selecting a mode or threshold does nothing yet — the callbacks are stubs. We'll bring them to life in [the next chapter](07-auto-logic.md).

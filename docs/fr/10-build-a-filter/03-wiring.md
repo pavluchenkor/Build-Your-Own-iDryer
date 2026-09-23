@@ -32,7 +32,7 @@ Vous pouvez choisir d'autres broches — mettez à jour les numéros dans le cod
 
 1. **Masse commune.** GND de l'alimentation, ESP32, module MOSFET et capteur doivent être connectés. La moitié des « ça ne marche pas » en bricolage — c'est la masse oubliée.
 2. **Capteur — uniquement 3,3 V.** SGP40 ne supporte pas 5 V en alimentation.
-3. **Ventilateur — uniquement via clé.** GPIO fournit des milliampères ; le ventilateur en consomme des centaines. La connexion directe grille la broche. Comment fonctionne la clé MOSFET — [Transistors et clés](../01-electronics-basics/06-transistors-and-mosfets.md).
+3. **Ventilateur — uniquement via clé.** GPIO fournit des milliampères ; le ventilateur en consomme des centaines. La connexion directe grille la broche. Comment fonctionne la clé MOSFET — [Transistors et clés](../01-electronics-basics/02-mosfet-module.md).
 4. **Diode de protection externe** pour ventilateur informatique généralement optionnelle : le ventilateur a sa propre électronique de commutation à l'intérieur, et de l'extérieur il ressemble à une charge électronique plutôt qu'à une pure inductance. Mais lors de la commutation de la ligne d'alimentation par la clé (surtout avec PWM), une diode de roue libre en parallèle avec le ventilateur est utile comme protection de la clé contre les pics inductifs — et s'il est déjà dans le module de clé, c'est un plus.
 
 !!! warning "Vérifiez la polarité avant d'allumer"

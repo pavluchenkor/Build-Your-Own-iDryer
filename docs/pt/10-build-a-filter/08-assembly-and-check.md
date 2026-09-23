@@ -36,4 +36,4 @@ Filtro pronto. Depois — a seu gosto:
 - **Layout bonito**: o `layoutRow` de fábrica que viu já;
 - **Os seus dispositivos**: toda esta secção — um template. Substitua sensor, mecanismo de accionamento e lógica — e pelo mesmo esquema construa humidificador, exaustor, controlador de qualquer coisa. O manifesto fará a interface por si.
 
-Se algo não fica operacional — [Erros Comuns](../08-common-mistakes/01-power-mistakes.md).
+Se algo não fica operacional — [Erros Comuns](../08-common-mistakes/01-overview.md).

@@ -148,16 +148,17 @@ In `layoutRow` übergeben Sie **ids** der Entities – jene internen Namen, die 
 Auf der Karte gibt das folgendes Layout:
 
 ```text
-┌─ DIY Air Filter ────────────────┐
-│  VOC index        │  Lüfter │   ← Reihe 1: voc, fan
-│  103              │  Aus     │
-├───────────────────┴─────────┤
+┌─ Air filter ────────────────────┐
+│  ▮ 129            │  ≋ Off      │   ← Reihe 1: voc, fan
+├───────────────────┴─────────────┤
 │  Mode                           │   ← Reihe 2: mode, threshold
 │  [auto                       ▾] │
 │  VOC threshold                  │
-│  [150                         ] │
+│  [100                         ] │
 └─────────────────────────────────┘
 ```
+
+Beachten Sie die Zellen: Das Portal zeichnet Symbol und Wert, ohne Beschriftung. Das `label` der Entity geht in den Namen für Screenreader und in andere Oberflächen, und auf der Karte wird Platz gespart. Bei Bedienelementen ist die Beschriftung sichtbar – `Mode` und `VOC threshold` im Schema oben.
 
 Entities, die Sie in keiner Reihe erwähnen, verschwinden nicht – das Portal zeichnet sie darunter automatisch. So können Sie nur das „Hauptsächliche" gestalten, Rest bleibt Automatik.
 
@@ -186,10 +187,16 @@ Das JSON zu verstehen ist nicht nötig – der Kern generiert es aus Ihren Aufru
 
 ## 5. Überprüfung
 
-Flashen Sie und öffnen Sie das Dashboard des Portals:
+Flashen Sie und öffnen Sie das **Dashboard des Portals** – die Karte lebt dort, wo auch die Karten der Seriengeräte stehen, und in der mobilen App. Auf der Seite des Geräts selbst gibt es sie nicht: dort stehen Graphen der Wörterbuch-Größen, das Menü und die Integrationen.
 
-- Zelle **VOC index** zeigt Live-Index (pusten Sie auf Sensor – Zahl wächst beim nächsten Update);
-- Zelle **Lüfter** – An/Aus;
+![Filter-Karte im Dashboard des Portals](../../img/10-filter/06-portal-card.png)
+*Die Karte ist nach dem Manifest zusammengesetzt: VOC-Index und Lüfter in einer Reihe, Modus und Schwelle – darunter.*
+
+![Dieselbe Karte in der mobilen App](../../img/10-filter/06-app-card.png)
+*Die App baut die Karte aus demselben Manifest – separater Code für das Telefon ist nicht nötig.*
+
+- die Index-Zelle zeigt den Live-Wert (pusten Sie auf den Sensor – die Zahl wächst beim nächsten Update);
+- die Lüfter-Zelle – An/Aus;
 - **Mode** — Dropdown-Liste, **VOC threshold** — Zahlenfeld: der Wert wird etwa 0,6 s nach der Änderung gesendet, ohne Bestätigungsknopf. Liste und Feld beginnen mit der ersten Option und dem Minimum — sie senden Befehle und zeigen nicht die aktuelle Einstellung des Geräts; den Zustand zeigen die Zellen (zum Beispiel der Lüfter).
 
 Modus- und Schwellen-Wahl macht noch nichts – die Callbacks sind Stubs. Wir erwecken sie im [nächsten Kapitel](07-auto-logic.md) zum Leben.

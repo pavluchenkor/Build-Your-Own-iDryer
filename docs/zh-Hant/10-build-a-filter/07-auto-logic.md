@@ -161,6 +161,19 @@ void setup() {
 | 入口網站的模式 `off` | 風扇停止，VOC 繼續顯示 |
 | 重新啟動主板 | 模式和閾值保存 |
 
+實際看起來是這樣。閾值 `150`，指標到達它——風扇自己啟動了：
+
+![自動化在閾值處啟動了風扇](../../img/10-filter/07-portal-auto-on.png)
+*模式 `auto`：指標 `151`、閾值 `150`——風扇已開啟。*
+
+![行動應用程式中的同一畫面](../../img/10-filter/07-app-auto-on.png)
+*應用程式顯示同樣的狀態：數值上升，風扇運轉中。*
+
+手動模式會壓過自動化：`Mode` → `on`，即使空氣已經乾淨，風扇照樣轉：
+
+![手動模式：空氣乾淨時風扇仍開啟](../../img/10-filter/07-portal-mode-on.png)
+*模式 `on`、指標 `132`——低於閾值，但風扇仍運轉：來自入口網站的命令優先於自動化。*
+
 ## 7. 最終程式碼：src/main.cpp 完整
 
 第 4–7 章所有程式碼，組裝成一個檔案。如果你的東西對不上——用這個清單檢查。
@@ -176,6 +189,7 @@ void setup() {
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // 無感測器時的指標（-DDEMO_VOC=1）
 
 // ── 接腳 ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // 風扇 MOSFET 閘極
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = 還沒有資料
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// 感測器，或在 -DDEMO_VOC=1 時用空氣模型（第 5 章）。
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // 指標：~100 = 普通空氣，更高 = 更髒（最高 500）
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── 風扇（第 7 章）────────────────────────────────────────

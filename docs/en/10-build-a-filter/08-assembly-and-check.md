@@ -36,4 +36,4 @@ Filter is ready. Next — your choice:
 - **Nice layout**: factory `layoutRow` you already saw;
 - **Your devices**: this whole section is a template. Replace the sensor, actuator, and logic — and by the same scheme assemble a humidifier, exhaust, controller of anything. The manifest will build the interface itself.
 
-If something doesn't start — [Common Mistakes](../08-common-mistakes/01-power-mistakes.md).
+If something doesn't start — [Common Mistakes](../08-common-mistakes/01-overview.md).

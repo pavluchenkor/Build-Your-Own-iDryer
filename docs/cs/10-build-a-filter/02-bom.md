@@ -18,7 +18,7 @@ description: "Seznam součástek filtru vzduchu: ESP32-C3, VOC senzor SGP40, ven
 | Zdroj napájení 12 V / 1 A | kterýkoliv kvalitní | ~$4 | napájení ventilátoru |
 | Regulátor napětí 12→5 V | mini-360 (buck) | ~$1 | napájení ESP32 ze stejného zdroje |
 
-Výběr desek — [Řadiče](../02-controllers/01-what-is-controller.md), o napájení a regulátorech — [Základy elektroniky](../01-electronics-basics/01-voltage-current-resistance.md).
+Výběr desek — [Řadiče](../02-controllers/00-how-to-choose-controller.md), o napájení a regulátorech — [Základy elektroniky](../01-electronics-basics/01-load-calculation-24v.md).
 
 ## Filtrační část
 
@@ -29,7 +29,7 @@ Výběr desek — [Řadiče](../02-controllers/01-what-is-controller.md), o nap�
 | Kryt | vytisknete (STL navrhnete pro svůj filtr) nebo použijete libovolnou vhodnou krabici | drží vše pohromadě |
 
 !!! note "Pořadí vrstev"
-    Vzduch musí proudit: vstup → HEPA → uhlí → ventilátor → výstup. Ventilátor umístěný „na výfuk" za filtry zamezí tomu, aby skulinami krytu proudil špinavý vzduch mimo filtr — ale obecně to není kritické: pracujeme s objemem vzduchu za čas, čím vyšší CFM ventilátoru, tím kratší čas na průchod.
+    Vzduch musí proudit: vstup → HEPA → uhlí → ventilátor → výstup. Ventilátor se umísťuje „na výfuk", za filtry: pak se skulinami krytu nenasává špinavý vzduch mimo filtr. Principiálně to není tak důležité — rozhoduje obměna objemu vzduchu za čas: čím vyšší výkon ventilátoru (CFM), tím je tento čas kratší.
 
 ## Proč SGP40
 
@@ -44,4 +44,4 @@ Alternativy:
 
 ## Nástroje
 
-Pájecí stanice, tavidlo, cín, multimetr, teplem smrštitelná bužírka. Podrobně — [Nástroje](../05-tools/01-multimeter.md).
+Pájecí stanice, tavidlo, cín, multimetr, teplem smrštitelná bužírka. Podrobně — [Nástroje](../05-tools/02-multimeter.md).

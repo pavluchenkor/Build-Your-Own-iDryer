@@ -7,6 +7,18 @@ description: "Filter-Firmware-Gerüst auf idryer-core: Config für Gerätetyp un
 
 Das Projekt-Gerüst wiederholt vollständig [das Kapitel aus dem Gehäuse-Beispiel](../09-build-a-device/04-firmware-start.md): PlatformIO, `idryer-core` in `lib/`, gleiches `platformio.ini` (ersetzen Sie nur die Umgebung auf `filter`). Hier – nur das, was anders ist.
 
+Das fertige Projekt dieses Kapitels – [example/10-filter](https://github.com/pavluchenkor/Build-Your-Own-iDryer/tree/main/example/10-filter) im Repository des Lehrbuchs: von dort stammen `platformio.ini` und der gesamte Code, der im Folgenden in Teilen besprochen wird. Die Kern-Bibliothek – [idryer-core](https://github.com/pavluchenkor/idryer-core).
+
+!!! note "Log auf den Port: zwei Build-Flags"
+    Beim ESP32-C3 geht die `Serial`-Ausgabe standardmäßig an die UART0-Pins und nicht an den USB-Port der Platine – der Serial Monitor bleibt leer. Um das Log zu sehen, werden in `build_flags` zwei Zeilen benötigt:
+
+    ```ini
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=1
+    ```
+
+    Meldungen des ESP-IDF selbst (mDNS-Fehler und Ähnliches) gehen auch ohne sie an USB, deshalb ist „es wird etwas ausgegeben, aber meine Zeilen fehlen" genau das Anzeichen für diese fehlenden Flags.
+
 ## Config: Gerät unbekannten Typs
 
 Der Filter hat weder einen Heizer noch einen Klima-Sensor aus dem Ökosystem-Wörterbuch. Von „Wörterbuch"-Fähigkeiten hat er nur einen Lüfter. In `src/main.cpp`:
@@ -60,5 +72,8 @@ Der Ablauf ist derselbe wie beim Schrank:
 3. Nach **Gerät gekoppelt** ist das Gerät mit Ihrem Konto gekoppelt und geht im Portal `Online`; im Log steht `MQTT: Connected!`.
 
 Details, mögliche Fehler und erneutes Koppeln — im [Kapitel des Schrank-Beispiels](../09-build-a-device/04-firmware-start.md).
+
+![Geräteseite im Portal direkt nach der Kopplung](../../img/10-filter/04-portal-device.png)
+*Gerät im Portal: Name, Zustand Idle, Verbindungssymbol. Der Graph ist leer und das Menü kam nicht – das Gerät hat nichts davon angemeldet.*
 
 Das Gerät ist bereits im Portal sichtbar, aber die Karte ist noch fast leer – wir haben ja noch keine Daten. Gehen wir den Sensor anschließen.

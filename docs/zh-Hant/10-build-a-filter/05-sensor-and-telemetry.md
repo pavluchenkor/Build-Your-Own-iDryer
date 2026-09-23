@@ -112,7 +112,39 @@ s_link.onTelemetryPublish([](JsonObject doc) {
 s_link.telemetry.fanOn[0] = fanIsOn;
 ```
 
-## 4. 檢查
+## 4. 手邊沒有感測器？示範模式
+
+沒有 SGP40 也能走完到卡片為止的流程：指標由空氣模型算出。從範例中複製 `demo_voc.h` 檔案：
+
+```bash
+git clone https://github.com/pavluchenkor/Build-Your-Own-iDryer.git ~/byo-idryer
+cp ~/byo-idryer/example/10-filter/src/demo_voc.h src/
+```
+
+並在 `platformio.ini` 中加入編譯旗標：
+
+```ini
+build_flags =
+    -DDEMO_VOC=1
+```
+
+兩個分支都藏在同一個函數後面，`loop()` 不知道值是從哪裡來的：
+
+```cpp
+static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
+    g_vocIndex = s_sgp.measureVocIndex();
+#endif
+}
+```
+
+模型的行為就像一個裡面有印表機正在列印的房間：風扇停著時，指標從約 `100` 的背景值慢慢往上爬；風扇運轉時則下降。模型的風扇狀態取自你自己的邏輯，因此[第 7 章](07-auto-logic.md)的閾值和遲滯可以直接看到效果。
+
+正式裝置不要設這個旗標：那時編譯的就是真實感測器的分支。
+
+## 5. 檢查
 
 燒錄韌體後，在裝置的 MQTT 串流中（或在序列埠發佈日誌中），遙測訊息看起來像這樣：
 
@@ -124,6 +156,9 @@ s_link.telemetry.fanOn[0] = fanIsOn;
 }
 ```
 
-`vocIndex` 是你的自訂欄位，進了雲端，並排在辭彙 `fanStatus` 旁。入口網站已經收到並保存它，但還不知道用它做什麼：在下一章向它展示。
+`vocIndex` 是你的自訂欄位，進了雲端，並排在辭彙 `fanStatus` 旁。入口網站已經收到它，但還不知道用它做什麼：在下一章向它展示。
+
+!!! note "自訂欄位只活在即時資料中"
+    入口網站把遙測原樣轉發給用戶端，所以卡片會立刻顯示 `vocIndex`。而寫進圖表歷史的，伺服器只記錄辭彙量——溫度、濕度、加熱。遙測圖表上不會有你的自訂欄位；如果需要歷史，就自己收集（例如 Home Assistant 或自己的資料庫）。
 
 對著感測器呼氣或靠近麥克筆——指標應在幾秒內明顯上升。

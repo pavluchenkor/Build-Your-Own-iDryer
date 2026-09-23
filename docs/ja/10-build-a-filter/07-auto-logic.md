@@ -161,6 +161,19 @@ void setup() {
 | ポータルから`off`モード | ファンは停止、VOC継続表示 |
 | ボードリセット | モードと閾値が保存されている |
 
+実際にはこのように見えます。閾値は`150`、インデックスがそこに達し — ファンが自動で起動しました:
+
+![閾値でオートメーションがファンを起動](../../img/10-filter/07-portal-auto-on.png)
+*モード`auto`: 閾値`150`に対してインデックス`151` — ファンはオン。*
+
+![モバイルアプリでの同じ状態](../../img/10-filter/07-app-auto-on.png)
+*アプリも同じ状態を表示します: 値が上がり、ファンが動いています。*
+
+手動モードはオートメーションより優先されます: `Mode` → `on`にすると、空気がすでにきれいでもファンは回り続けます:
+
+![手動モード: 空気がきれいでもファンはオン](../../img/10-filter/07-portal-mode-on.png)
+*モード`on`、インデックス`132` — 閾値より下ですがファンは動いています: ポータルからのコマンドはオートメーションより優先されます。*
+
 ## 7. 最終コード: src/main.cpp 全体
 
 第4〜7章のすべてのコードを1つのファイルにまとめたものです。手元のコードで合わない部分があれば、このリストと照合してください:
@@ -176,6 +189,7 @@ void setup() {
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // センサーなしのインデックス（-DDEMO_VOC=1）
 
 // ── ピン ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // ファンMOSFETゲート
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = データなし
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// センサー、または-DDEMO_VOC=1で空気のモデル（第5章）。
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // インデックス: ~100 = 通常空気、高い = より汚い（最大500）。
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── ファン（第7章）────────────────────────────────────────────

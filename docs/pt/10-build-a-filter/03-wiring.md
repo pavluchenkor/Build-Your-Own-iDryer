@@ -32,7 +32,7 @@ Pode escolher outros pinos — mude os números no código ([capítulo 5](05-sen
 
 1. **Massa comum.** GND da fonte, ESP32, módulo MOSFET e sensor devem estar ligados. Metade dos «não funciona» em projetos caseiros — massa comum esquecida.
 2. **Sensor — apenas 3.3 V.** SGP40 não suporta 5 V na alimentação.
-3. **Ventilador — apenas através de chave.** GPIO fornece miliamperes; ventilador consome centenas. Ligação direta queima o pino. Como funciona a chave MOSFET — [Transístores e chaves](../01-electronics-basics/06-transistors-and-mosfets.md).
+3. **Ventilador — apenas através de chave.** GPIO fornece miliamperes; ventilador consome centenas. Ligação direta queima o pino. Como funciona a chave MOSFET — [Transístores e chaves](../01-electronics-basics/02-mosfet-module.md).
 4. **Díodo de protecção externa** para ventilador de computador geralmente não é obrigatório: o ventilador tem eletrónica de comutação interna e, externamente, parece uma carga electrónica, não uma indutância pura. Mas ao comutar a linha de alimentação com a chave (especialmente com PWM), um díodo de proteção em paralelo com o ventilador é útil contra picos indutivos na chave — e se já está no módulo da chave, é apenas mais um benefício.
 
 !!! warning "Verifique a polaridade antes de ligar"

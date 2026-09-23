@@ -161,6 +161,19 @@ void setup() {
 | 从门户模式`off` | 风机停，VOC继续显示 |
 | 重启板 | 模式和阈值保存 |
 
+实际运行时是这样的。阈值`150`，指数升到了这个值——风机自己打开了：
+
+![自动逻辑在阈值处打开了风机](../../img/10-filter/07-portal-auto-on.png)
+*模式`auto`：阈值为`150`时指数是`151` —— 风机已打开。*
+
+![移动应用中的同样情况](../../img/10-filter/07-app-auto-on.png)
+*应用显示同样的状态：数值上升了，风机在运转。*
+
+手动模式压过自动逻辑：`Mode` → `on`，即使空气已经干净，风机照样转：
+
+![手动模式：空气干净时风机仍然打开](../../img/10-filter/07-portal-mode-on.png)
+*模式`on`，指数`132` —— 低于阈值，但风机在运转：门户的命令优先于自动逻辑。*
+
 ## 7. 最终代码：src/main.cpp完整
 
 第4–7章的所有代码，收集到一个文件中。如果有不一致，对照这个清单。
@@ -176,6 +189,7 @@ void setup() {
 #include <Wire.h>
 #include <Adafruit_SGP40.h>
 #include <Preferences.h>
+#include "demo_voc.h"                 // 没有传感器时的指数（-DDEMO_VOC=1）
 
 // ── 引脚 ────────────────────────────────────────────────────
 static const int FAN_PIN = 4;         // 风机MOSFET栅极
@@ -208,15 +222,22 @@ static Adafruit_SGP40 s_sgp;
 static int32_t g_vocIndex = -1;       // -1 = 没数据
 
 static void initVocSensor() {
+#ifndef DEMO_VOC
     Wire.begin(/*SDA=*/8, /*SCL=*/9);
     if (!s_sgp.begin()) {
         Serial.println("[VOC] SGP40 not found, check wiring");
     }
+#endif
 }
 
+// 传感器，或者在-DDEMO_VOC=1时使用空气模型（第5章）。
 static void readVocSensor() {
+#ifdef DEMO_VOC
+    g_vocIndex = demoVocIndex(g_fanOn);
+#else
     // 指数：~100 = 普通空气，更高 = 更脏（最高500）。
     g_vocIndex = s_sgp.measureVocIndex();
+#endif
 }
 
 // ── 风机（第7章） ────────────────────────────────────────────
